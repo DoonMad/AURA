@@ -1,4 +1,7 @@
-module.exports = {
+export default {
   root: true,
   extends: '@react-native',
+  rules: {
+    'react-native/no-inline-styles': 'off',
+  },
 };
