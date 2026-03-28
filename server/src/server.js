@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import registerSocketEventHandlers from "./socket";
 
 const app = express();
 app.use(cors());
@@ -15,6 +16,7 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
     console.log(socket.id);
+    registerSocketEventHandlers(socket, io);
 })
 
 server.listen(3000, () => {
