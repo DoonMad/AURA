@@ -23,10 +23,28 @@ export default function registerSocketEventHandlers (socket, io) {
         const user = new User(displayName, deviceId, roomId);
         users.set(deviceId, user);
 
+        socket.join(roomId);
+        socket.emit("roomJoined", room);
+
         console.log(displayName, deviceId, "created a room ", roomId);
     });
 
     socket.on("joinRoom", ({deviceId, displayName, roomId}) => {
-        console.log("user" + socket.id + " wants to join room");
+        if (!rooms.has(roomId)) {
+            socket.emit("error", { message: "Room not found" });
+            console.log(displayName, deviceId, "failed to join room", roomId, "(not found)");
+            return;
+        }
+
+        const room = rooms.get(roomId);
+        room.addMember(deviceId);
+
+        const user = new User(displayName, deviceId, roomId);
+        users.set(deviceId, user);
+
+        socket.join(roomId);
+        socket.emit("roomJoined", room);
+
+        console.log(displayName, deviceId, "joined room", roomId);
     });
 }

@@ -17,15 +17,18 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import TextInputField from '../components/TextInputField';
 import PrimaryButton from '../components/PrimaryButton';
 import SectionDivider from '../components/SectionDivider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createIOConnection from '../services/socket';
-import type { EntryScreenProps } from '../types/components';
+import type { RootStackParamList } from '../types/navigation';
 
+type EntryScreenProps = NativeStackScreenProps<RootStackParamList, 'Entry'>;
 
-const EntryScreen: React.FC<EntryScreenProps> = ({ deviceId }) => {
+const EntryScreen: React.FC<EntryScreenProps> = ({ route, navigation }) => {
+  const { deviceId } = route.params;
   const [displayName, setDisplayName] = useState("");
   const [roomId, setRoomId] = useState("");
 
@@ -40,7 +43,39 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ deviceId }) => {
     getDisplayName();
   }, []);
 
+  useEffect(() => {
+    const socket = createIOConnection();
+
+    const handleRoomCreated = (room: any) => {
+      console.log('Room created:', room.id);
+      navigation.navigate('Room', { roomId: room.id });
+    };
+
+    const handleRoomJoined = (room: any) => {
+      console.log('Room joined:', room.id);
+      navigation.navigate('Room', { roomId: room.id });
+    };
+
+    const handleError = (error: any) => {
+      console.warn('Socket error:', error);
+    };
+
+    socket.on('roomCreated', handleRoomCreated);
+    socket.on('roomJoined', handleRoomJoined);
+    socket.on('error', handleError);
+
+    return () => {
+      socket.off('roomCreated', handleRoomCreated);
+      socket.off('roomJoined', handleRoomJoined);
+      socket.off('error', handleError);
+    };
+  }, [navigation]);
+
   const handleJoinRoom = async () => {
+    if (!displayName) {
+      console.warn('Please enter a display name');
+      return;
+    }
     if (roomId && roomId.length === 6) {
       const socket = createIOConnection();
       socket.emit('joinRoom', { deviceId, displayName, roomId });
@@ -49,6 +84,10 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ deviceId }) => {
   };
 
   const handleCreateRoom = async () => {
+    if (!displayName) {
+      console.warn('Please enter a display name');
+      return;
+    }
     const socket = createIOConnection();
     socket.emit('createRoom', { deviceId, displayName });
     await AsyncStorage.setItem('displayName', displayName);
