@@ -1,6 +1,6 @@
-import User from "./models/User";
-import Channel from "./models/Channel";
-import Room from "./models/Room";
+import User from "./models/User.js";
+import Channel from "./models/Channel.js";
+import Room from "./models/Room.js";
 
 const rooms = new Map(), users = new Map();
 
@@ -22,5 +22,11 @@ export default function registerSocketEventHandlers (socket, io) {
 
         const user = new User(displayName, deviceId, roomId);
         users.set(deviceId, user);
+
+        console.log(displayName, deviceId, "created a room ", roomId);
+    });
+
+    socket.on("joinRoom", ({deviceId, displayName, roomId}) => {
+        console.log("user" + socket.id + " wants to join room");
     });
 }

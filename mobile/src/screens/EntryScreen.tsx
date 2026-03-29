@@ -8,7 +8,7 @@
  * Uses inline style only for letterSpacing (not supported by NativeWind).
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,19 +17,45 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { EntryScreenProps } from '../types/components';
 import TextInputField from '../components/TextInputField';
 import PrimaryButton from '../components/PrimaryButton';
 import SectionDivider from '../components/SectionDivider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import createIOConnection from '../services/socket';
+import type { EntryScreenProps } from '../types/components';
 
-const EntryScreen: React.FC<EntryScreenProps> = ({
-  displayName,
-  onDisplayNameChange,
-  onCreateRoom,
-  roomCode,
-  onRoomCodeChange,
-  onJoinRoom,
-}) => {
+
+const EntryScreen: React.FC<EntryScreenProps> = ({ deviceId }) => {
+  const [displayName, setDisplayName] = useState("");
+  const [roomId, setRoomId] = useState("");
+
+  useEffect(() => {
+    const getDisplayName = async () => {
+      let name = await AsyncStorage.getItem('displayName');
+      if (name) {
+        setDisplayName(name);
+      }
+    };
+
+    getDisplayName();
+  }, []);
+
+  const handleJoinRoom = async () => {
+    if (roomId && roomId.length === 6) {
+      const socket = createIOConnection();
+      socket.emit('joinRoom', { deviceId, displayName, roomId });
+      await AsyncStorage.setItem('displayName', displayName);
+    }
+  };
+
+  const handleCreateRoom = async () => {
+    const socket = createIOConnection();
+    socket.emit('createRoom', { deviceId, displayName });
+    await AsyncStorage.setItem('displayName', displayName);
+  };
+
+
+
   return (
     <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView
@@ -66,7 +92,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({
               <TextInputField
                 placeholder="Enter your name"
                 value={displayName}
-                onChangeText={onDisplayNameChange}
+                onChangeText={(e) => {setDisplayName(e)}}
                 autoCapitalize="words"
               />
             </View>
@@ -75,7 +101,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({
             <View className="mb-aura-lg">
               <PrimaryButton
                 title="Create Room"
-                onPress={onCreateRoom}
+                onPress={handleCreateRoom}
                 variant="filled"
               />
             </View>
@@ -90,14 +116,14 @@ const EntryScreen: React.FC<EntryScreenProps> = ({
               </Text>
               <TextInputField
                 placeholder="Enter Room Code"
-                value={roomCode}
-                onChangeText={onRoomCodeChange}
+                value={roomId}
+                onChangeText={(e) => {setRoomId(e)}}
                 autoCapitalize="characters"
               />
               <View className="h-aura-md" />
               <PrimaryButton
                 title="Join Room"
-                onPress={onJoinRoom}
+                onPress={handleJoinRoom}
                 variant="outline"
               />
             </View>

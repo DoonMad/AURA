@@ -1,4 +1,4 @@
-import Channel from "./Channel";
+import Channel from "./Channel.js";
 
 const ROOM_ID_LENGTH = 6;
 const ROOM_ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

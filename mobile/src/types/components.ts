@@ -45,10 +45,5 @@ export interface SectionDividerProps {
  * ──────────────────────────────────────────── */
 
 export interface EntryScreenProps {
-  displayName: string;
-  onDisplayNameChange: (text: string) => void;
-  onCreateRoom: () => void;
-  roomCode: string;
-  onRoomCodeChange: (text: string) => void;
-  onJoinRoom: () => void;
+  deviceId: string | null;
 }
