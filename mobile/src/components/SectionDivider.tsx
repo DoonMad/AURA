@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { View, Text } from 'react-native';
-import type { SectionDividerProps } from '../types/components';
+import type { SectionDividerProps } from '../types';
 
 const SectionDivider: React.FC<SectionDividerProps> = ({ label, style }) => {
   return (

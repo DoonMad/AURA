@@ -3,5 +3,6 @@ export default class User {
         this.name = name;
         this.id = id;
         this.roomId = roomId;
+        this.isSpeaking = false;
     }
 }

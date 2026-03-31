@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { TouchableOpacity, Text } from 'react-native';
-import type { PrimaryButtonProps } from '../types/components';
+import type { PrimaryButtonProps } from '../types';
 
 const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   title,

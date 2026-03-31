@@ -23,9 +23,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import SectionDivider from '../components/SectionDivider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createIOConnection from '../services/socket';
-import type { RootStackParamList } from '../types/navigation';
-
-type EntryScreenProps = NativeStackScreenProps<RootStackParamList, 'Entry'>;
+import type { RootStackParamList, EntryScreenProps } from '../types';
 
 const EntryScreen: React.FC<EntryScreenProps> = ({ route, navigation }) => {
   const { deviceId } = route.params;
