@@ -1,5 +1,10 @@
+import { Room, User } from "./models";
+
 export type RootStackParamList = {
   Entry: { deviceId: string };
-  Room: { roomId: string };
+  Room: {
+    room: Room,
+    members: User[]
+  };
   Members?: undefined;
 };

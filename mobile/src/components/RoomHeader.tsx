@@ -1,28 +1,45 @@
 import React from 'react'
-import { View, Text } from 'react-native'
+import { View, Text, TouchableOpacity } from 'react-native'
 import type { ConnectionState, RoomHeaderProps } from '../types'
+import Icon from 'react-native-vector-icons/Feather'
 
-const statusStyles: Record<ConnectionState, string> = {
-  connected: 'text-green-400 bg-green-900',
-  reconnecting: 'text-yellow-300 bg-yellow-900',
-  disconnected: 'text-red-400 bg-red-900',
+const statusDot: Record<ConnectionState, string> = {
+  connected: 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]',
+  reconnecting: 'bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)]',
+  disconnected: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]',
 }
 
-const statusLabel: Record<ConnectionState, string> = {
-  connected: 'Connected',
-  reconnecting: 'Reconnecting',
-  disconnected: 'Disconnected',
+export interface ExtendedRoomHeaderProps extends RoomHeaderProps {
+  onSharePress?: () => void;
 }
 
-const RoomHeader: React.FC<RoomHeaderProps> = ({ roomName, connectionState }) => {
+const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionState, onSharePress }) => {
   return (
-    <View className="flex-row items-center justify-between px-aura-lg py-aura-sm bg-surface rounded-aura-xl mb-aura-md">
-      <View>
-        <Text className="text-aura-2xl font-extrabold text-aura-text">{roomName}</Text>
-        <Text className="text-aura-sm text-aura-muted mt-aura-1">Room ID: #{roomName.toLowerCase().replace(/\s+/g, '')}</Text>
+    <View className="flex-row items-center justify-between px-aura-xl py-aura-lg bg-surface/90 border-b border-aura-border z-30 w-full pt-12 shadow-lg backdrop-blur-md">
+      {/* Title & Connection Dot */}
+      <View className="flex-row items-center">
+        <View>
+          <Text className="text-aura-xl font-extrabold text-white tracking-[4px] uppercase">{roomName}</Text>
+          <View className="flex-row items-center mt-1">
+            <View className={`w-2 h-2 rounded-full mr-2 ${statusDot[connectionState]}`} />
+            <Text className="text-[10px] text-aura-muted uppercase tracking-widest font-bold">
+              #{roomName?.toLowerCase().replace(/\s+/g, '')}
+            </Text>
+          </View>
+        </View>
       </View>
-      <View className={`px-aura-2 py-aura-1 rounded-aura-md ${statusStyles[connectionState]}`}>
-        <Text className="text-xs font-semibold uppercase">{statusLabel[connectionState]}</Text>
+
+      {/* Action Buttons */}
+      <View className="flex-row items-center space-x-3">
+        {onSharePress && (
+          <TouchableOpacity 
+            onPress={onSharePress}
+            activeOpacity={0.6}
+            className="w-10 h-10 rounded-full bg-surface-light border border-aura-border items-center justify-center"
+          >
+            <Icon name="share-2" size={18} color="#A78BFA" />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   )

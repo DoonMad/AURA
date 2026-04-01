@@ -1,39 +1,41 @@
 import React from 'react'
 import { View, Text, TouchableOpacity } from 'react-native'
 import type { BottomControlsProps } from '../types'
+import Icon from 'react-native-vector-icons/Feather'
 
-const BottomControls: React.FC<BottomControlsProps> = ({
+const BottomControls: React.FC<Omit<BottomControlsProps, 'onSharePress'>> = ({
   memberChannelCount,
   totalMemberCount,
   onMembersPress,
   onLeavePress,
-  onSharePress,
   volume,
   onVolumeChange,
 }) => {
   return (
-    <View className="bg-surface p-aura-md rounded-aura-xl space-y-aura-3">
-      <View className="flex-row justify-between items-center">
-        <Text className="text-aura-sm text-aura-text">{memberChannelCount} in channel • {totalMemberCount} total</Text>
-        <TouchableOpacity onPress={onMembersPress} className="bg-primary rounded-aura-md px-aura-3 py-aura-2">
-          <Text className="text-white font-semibold">Members</Text>
+    <View className="absolute bottom-10 w-full flex-row justify-between px-aura-xl items-end z-10 pointer-events-box-none">
+      {/* Left Dock: Members & Info */}
+      <View className="items-center pointer-events-auto">
+        <TouchableOpacity
+          onPress={onMembersPress}
+          activeOpacity={0.7}
+          className="w-14 h-14 bg-surface rounded-full items-center justify-center border border-aura-border shadow-lg"
+        >
+          <Icon name="users" size={24} color="#EEEDF2" />
         </TouchableOpacity>
+        <Text className="text-[10px] font-bold mt-2 text-aura-muted uppercase tracking-widest">{memberChannelCount}/{totalMemberCount}</Text>
       </View>
 
-      <View className="space-y-aura-2">
-        <Text className="text-aura-sm text-aura-muted">Volume</Text>
-        <View className="h-aura-2 w-full bg-aura-muted/30 rounded-full overflow-hidden">
-          <View className="h-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, volume * 100))}%` }} />
-        </View>
-      </View>
-
-      <View className="flex-row justify-between">
-        <TouchableOpacity onPress={onLeavePress} className="bg-red-500 rounded-aura-md px-aura-4 py-aura-2">
-          <Text className="text-white font-semibold">Leave</Text>
+      {/* Right Dock: Leave */}
+      <View className="items-center pointer-events-auto">
+        <TouchableOpacity
+          onPress={onLeavePress}
+          activeOpacity={0.7}
+          className="w-14 h-14 bg-surface/50 rounded-full items-center justify-center border border-red-500/50 shadow-lg relative overflow-hidden"
+        >
+          <View className="absolute inset-0 bg-red-500/10" />
+          <Icon name="power" size={22} color="#EF4444" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={onSharePress} className="bg-blue-500 rounded-aura-md px-aura-4 py-aura-2">
-          <Text className="text-white font-semibold">Share</Text>
-        </TouchableOpacity>
+        <Text className="text-[10px] font-bold mt-2 text-red-500/80 uppercase tracking-widest">Exit</Text>
       </View>
     </View>
   )

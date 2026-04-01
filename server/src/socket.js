@@ -24,9 +24,9 @@ export default function registerSocketEventHandlers (socket, io) {
         users.set(deviceId, user);
 
         socket.join(roomId);
-        socket.emit("roomJoined", room);
+        socket.emit("roomJoined", { room, users: room.members.map(id => users.get(id)).filter(Boolean) });
 
-        console.log(displayName, deviceId, "created a room ", roomId);
+        console.log(displayName, deviceId, "created a room ", room);
     });
 
     socket.on("joinRoom", ({deviceId, displayName, roomId}) => {
@@ -43,7 +43,7 @@ export default function registerSocketEventHandlers (socket, io) {
         users.set(deviceId, user);
 
         socket.join(roomId);
-        socket.emit("roomJoined", room);
+        socket.emit("roomJoined", { room, users: room.members.map(id => users.get(id)).filter(Boolean) });
 
         console.log(displayName, deviceId, "joined room", roomId);
     });

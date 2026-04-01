@@ -49,7 +49,9 @@ export type ConnectionState = 'connected' | 'reconnecting' | 'disconnected';
 export interface RoomHeaderProps {
   roomName: string;
   connectionState: ConnectionState;
+  onSharePress?: () => void;
 }
+
 
 /* ────────────────────────────────────────────
  * PushToTalkButton

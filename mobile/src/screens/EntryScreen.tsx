@@ -23,7 +23,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import SectionDivider from '../components/SectionDivider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createIOConnection from '../services/socket';
-import type { RootStackParamList, EntryScreenProps } from '../types';
+import type { RootStackParamList, EntryScreenProps, Room, User } from '../types';
 
 const EntryScreen: React.FC<EntryScreenProps> = ({ route, navigation }) => {
   const { deviceId } = route.params;
@@ -44,26 +44,26 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ route, navigation }) => {
   useEffect(() => {
     const socket = createIOConnection();
 
-    const handleRoomCreated = (room: any) => {
-      console.log('Room created:', room.id);
-      navigation.navigate('Room', { roomId: room.id });
-    };
+    // const handleRoomCreated = (room: any) => {
+    //   console.log('Room created:', room.id);
+    //   navigation.navigate('Room', { roomId: room.id });
+    // };
 
-    const handleRoomJoined = (room: any) => {
-      console.log('Room joined:', room.id);
-      navigation.navigate('Room', { roomId: room.id });
+    const handleRoomJoined = (data: { room: Room; users: User[] }) => {
+      console.log('Room joined:', data.room);
+      navigation.navigate('Room', { room: data.room, members: data.users });
     };
 
     const handleError = (error: any) => {
       console.warn('Socket error:', error);
     };
 
-    socket.on('roomCreated', handleRoomCreated);
+    // socket.on('roomCreated', handleRoomCreated);
     socket.on('roomJoined', handleRoomJoined);
     socket.on('error', handleError);
 
     return () => {
-      socket.off('roomCreated', handleRoomCreated);
+      // socket.off('roomCreated', handleRoomCreated);
       socket.off('roomJoined', handleRoomJoined);
       socket.off('error', handleError);
     };

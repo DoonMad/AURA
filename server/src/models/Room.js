@@ -10,7 +10,10 @@ export default class Room {
         this.members = [adminDeviceId];
         this.pastMembers = [];
         this.channels = {
-            "channel-1": new Channel("channel-1", "Channel 1")
+            "channel-1": new Channel("channel-1", "Channel 1"),
+            "channel-2": new Channel("channel-2", "Channel 2"),
+            "channel-3": new Channel("channel-3", "Channel 3"),
+            "channel-4": new Channel("channel-4", "Channel 4")
         };
     }
 
