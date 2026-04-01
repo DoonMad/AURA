@@ -2,6 +2,7 @@ import { getRoom, createRoom, removeRoom } from "./repositories/roomRepository.j
 import { getUser, getOrCreateUser, removeUser, getUsersInRoom } from "./repositories/userRepository.js";
 import registerRoomEventHandlers from "./handlers/roomHandler.js";
 import registerChannelEventHandlers from "./handlers/channelHandler.js";
+import registerAudioEventHandlers from "./handlers/audioHandler.js";
 
 /**
  * @param {import("socket.io").Socket} socket
@@ -10,7 +11,7 @@ import registerChannelEventHandlers from "./handlers/channelHandler.js";
 export default function registerSocketEventHandlers (socket, io) {
     registerRoomEventHandlers(socket, io);
     registerChannelEventHandlers(socket, io);
-    
+    registerAudioEventHandlers(socket, io);
 
     socket.on("disconnect", () => {
         const user = getUser(socket.id);
