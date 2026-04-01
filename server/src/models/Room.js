@@ -8,12 +8,15 @@ export default class Room {
         this.id = id;
         this.admins = [adminDeviceId];
         this.members = [adminDeviceId];
-        this.pastMembers = [];
         this.channels = {
             "channel-1": new Channel("channel-1", "Channel 1"),
             "channel-2": new Channel("channel-2", "Channel 2"),
             "channel-3": new Channel("channel-3", "Channel 3"),
-            "channel-4": new Channel("channel-4", "Channel 4")
+            "channel-4": new Channel("channel-4", "Channel 4"),
+            "channel-5": new Channel("channel-5", "Channel 5"),
+            "channel-6": new Channel("channel-6", "Channel 6"),
+            "channel-7": new Channel("channel-7", "Channel 7"),
+            "channel-8": new Channel("channel-8", "Channel 8")
         };
     }
 
@@ -33,9 +36,6 @@ export default class Room {
 
     removeMember(user) {
         this.members = this.members.filter((member) => member !== user);
-        if (!this.pastMembers.includes(user)) {
-            this.pastMembers.push(user);
-        }
     }
 
     getChannel(channelId) {
