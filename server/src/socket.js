@@ -1,5 +1,5 @@
 import { getRoom, createRoom, removeRoom } from "./repositories/roomRepository.js";
-import { getUser, getOrCreateUser, removeUser, getUsersInRoom } from "./repositories/userRepository.js";
+import { getUser, removeUser } from "./repositories/userRepository.js";
 import registerRoomEventHandlers from "./handlers/roomHandler.js";
 import registerChannelEventHandlers from "./handlers/channelHandler.js";
 import registerAudioEventHandlers from "./handlers/audioHandler.js";

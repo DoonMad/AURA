@@ -1,4 +1,4 @@
-import { getRoom } from "./repositories/roomRepository.js";
+import { getRoom } from "../repositories/roomRepository.js";
 
 export default function registerChannelEventHandlers (socket, io) {
     socket.on("joinChannel", ({deviceId, roomId, channelId}) => {

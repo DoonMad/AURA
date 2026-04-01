@@ -1,6 +1,6 @@
 
 
-export function registerAudioEventHandlers (socket, io) {
+export default function registerAudioEventHandlers (socket, io) {
     socket.on("requestMic", ({deviceId, roomId, channelId}) => {
         console.log(deviceId, "requested mic in room", roomId, "channel", channelId);
     });

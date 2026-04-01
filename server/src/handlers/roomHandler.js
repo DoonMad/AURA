@@ -1,9 +1,10 @@
-import { getRoom, createRoom, removeRoom } from "./repositories/roomRepository.js";
-import { getUser, getOrCreateUser, removeUser, getUsersInRoom } from "./repositories/userRepository.js";
+import { getRoom, createRoom, removeRoom } from "../repositories/roomRepository.js";
+import { removeUser, getUsersInRoom } from "../repositories/userRepository.js";
 
 export default function registerRoomEventHandlers (socket, io) {
     socket.on("createRoom", ({deviceId, displayName}) => {
         const room = createRoom(deviceId);
+        room.addMember(deviceId);
         createUser(deviceId, displayName, room.id);
 
         socket.join(room.id);
