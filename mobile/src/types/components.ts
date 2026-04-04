@@ -61,7 +61,8 @@ export type TalkState = 'idle' | 'ready' | 'speaking_self' | 'speaking_other';
 
 export interface PushToTalkButtonProps {
   state: TalkState;
-  onPress?: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
 }
 
 /* ────────────────────────────────────────────
@@ -100,22 +101,11 @@ export interface BottomControlsProps {
  * ──────────────────────────────────────────── */
 
 export interface SpeakerAreaProps {
-  speakerName?: string;
+  speakerName?: string | null;
   isActive?: boolean;
 }
 
-/* ────────────────────────────────────────────
- * RotaryDial
- * ──────────────────────────────────────────── */
 
-export type ChannelState = 'free' | 'speaking' | 'idle';
-
-export type DialChannel = { id: string; name: string; state: ChannelState };
-
-export interface RotaryDialProps {
-  channels: DialChannel[];
-  currentChannelId: string;
-}
 
 /* ────────────────────────────────────────────
  * MembersScreen
@@ -123,11 +113,4 @@ export interface RotaryDialProps {
 
 export type Member = { id: string; name: string; isSpeaking?: boolean };
 
-export interface MembersScreenProps {
-  currentChannelMembers: Member[];
-  allMembers: Member[];
-  showAdminControls?: boolean;
-  onCreateChannel?: () => void;
-  onRenameChannel?: () => void;
-}
 

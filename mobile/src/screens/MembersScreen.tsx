@@ -1,27 +1,37 @@
 import React from 'react'
 import { ScrollView, Text, View, TouchableOpacity } from 'react-native'
 import MemberListItem from '../components/MemberListItem'
-import type { MembersScreenProps } from '../types'
+import type { MembersScreenProps, User } from '../types'
 import Icon from 'react-native-vector-icons/Feather'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-const MembersScreen: React.FC<MembersScreenProps> = ({
-  currentChannelMembers = [],
-  allMembers = [],
-  showAdminControls = false,
-  onCreateChannel,
-  onRenameChannel,
-}) => {
+const MembersScreen: React.FC<MembersScreenProps> = ({ route, navigation }) => {
+  const { room, members } = route.params
+  const showAdminControls = room.admins.includes(members[0].id) // TODO: Replace with actual admin check
+
+  const onCreateChannel = () => {
+    // TODO: Implement
+  }
+
+  const onRenameChannel = () => {
+    // TODO: Implement
+  }
 
   // For visual demo if empty
-  const defaultChannelMembers = currentChannelMembers.length ? currentChannelMembers : [
-    { id: '1', name: 'Alpha Leader', isSpeaking: true },
-    { id: '2', name: 'Bravo Six', isSpeaking: false },
+  const firstChannel = Object.values(room.channels)[0];
+  const channelMemberIds = firstChannel ? firstChannel.members : [];
+  const mappedChannelMembers = channelMemberIds
+    .map(id => members.find(m => m.id === id))
+    .filter((m): m is User => m !== undefined);
+
+  const defaultChannelMembers: User[] = mappedChannelMembers.length ? mappedChannelMembers : [
+    { id: '1', name: 'Alpha Leader', isSpeaking: true, roomId: room.id },
+    { id: '2', name: 'Bravo Six', isSpeaking: false, roomId: room.id },
   ];
 
-  const defaultAllMembers = allMembers.length ? allMembers : [
-    { id: '3', name: 'Delta Actual', isSpeaking: false },
-    { id: '4', name: 'Echo Base', isSpeaking: false },
+  const defaultAllMembers: User[] = members.length ? members : [
+    { id: '3', name: 'Delta Actual', isSpeaking: false, roomId: room.id },
+    { id: '4', name: 'Echo Base', isSpeaking: false, roomId: room.id },
     ...defaultChannelMembers
   ];
 

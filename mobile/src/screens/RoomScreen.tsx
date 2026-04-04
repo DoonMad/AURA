@@ -6,35 +6,41 @@ import SpeakerArea from '../components/SpeakerArea'
 import PushToTalkButton from '../components/PushToTalkButton'
 import BottomControls from '../components/BottomControls'
 import ChannelSelector from '../components/ChannelSelector'
-import type { Channel, DialChannel, RoomScreenProps, ChannelState } from '../types'
+import type { Channel, RoomScreenProps } from '../types'
 
-const RoomScreen: React.FC<RoomScreenProps> = ({ route }) => {
+const RoomScreen: React.FC<RoomScreenProps> = ({ route, navigation }) => {
   const { room, members } = route.params
 
   const [roomName, setRoomName] = useState(room.id)
-  const [channels, setChannels] = useState<DialChannel[]>([])
-  const [selectedChannelId, setSelectedChannelId] = useState<string>('')
-  const [selectedSpeaker, setSelectedSpeaker] = useState<string | undefined>(undefined)
+  const [channels, setChannels] = useState<Channel[]>(Object.values(room.channels))
+  
+  const firstChannel = channels[0];
+  const [selectedChannelId, setSelectedChannelId] = useState<string>(firstChannel?.id ?? '')
+  
   const [talkState, setTalkState] = useState<'idle' | 'ready' | 'speaking_self' | 'speaking_other'>('idle')
-  const [totalMembers, setTotalMembers] = useState(members.length)
   const [volume, setVolume] = useState(0.5)
   const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'disconnected'>('connected')
-  const [membersInChannel, setMembersInChannel] = useState(0)
 
   useEffect(() => {
-    const dialChannels: DialChannel[] = Object.values(room.channels).map((channel: Channel) => ({
-      id: channel.id,
-      name: channel.name,
-      state: channel.activeSpeaker ? 'speaking' : (channel.members.length > 0 ? 'idle' : 'free') as ChannelState
-    }));
-    setChannels(dialChannels);
-    if (dialChannels.length > 0 && selectedChannelId === '') {
-      setSelectedChannelId(dialChannels[0].id);
+    const parsedChannels: Channel[] = Object.values(room.channels);
+    setChannels(parsedChannels);
+    if (parsedChannels.length > 0 && !selectedChannelId) {
+      setSelectedChannelId(parsedChannels[0].id);
     }
-  }, [room.channels, selectedChannelId]);
+  }, [room.channels]); // Removed selectedChannelId as dependency to avoid infinite loops
+
+  // Derived state (no need for useState)
+  const selectedChannel = channels?.find((c) => c.id === selectedChannelId);
+  const currentIndex = channels.findIndex(ch => ch.id === selectedChannelId);
+  
+  const membersInChannel = selectedChannel?.members?.length ?? 0;
+  const totalMembers = members.length;
+  
+  const activeSpeakerId = selectedChannel?.activeSpeaker;
+  const activeSpeakerName = members.find(m => m.id === activeSpeakerId)?.name ?? null;
 
   const onMembersPress = () => {
-    // TODO: Navigate to members screen
+    navigation.navigate('Members', { room, members })
   }
 
   const onLeavePress = () => {
@@ -46,8 +52,12 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route }) => {
     // TODO: open share sheet with room link or code
   }
 
-  const onTalkPress = () => {
-    setTalkState(prev => prev === 'idle' ? 'ready' : (prev === 'ready' ? 'speaking_self' : 'idle'))
+  const onTalkPressIn = () => {
+    setTalkState('ready')
+  }
+
+  const onTalkPressOut = () => {
+    setTalkState('idle')
   }
 
   const onPrevChannel = () => {
@@ -64,8 +74,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route }) => {
     setSelectedChannelId(channels[nextIdx].id)
   }
 
-  const selectedChannel = channels?.find((c) => c.id === selectedChannelId)
-  const currentIndex = channels.findIndex(ch => ch.id === selectedChannelId)
+
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
@@ -97,7 +106,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route }) => {
           <View style={{ flex: 1.5 }} />
 
           <SpeakerArea 
-            speakerName={selectedSpeaker} 
+            speakerName={activeSpeakerName} 
             isActive={talkState === 'speaking_other' || talkState === 'speaking_self'} 
           />
 
@@ -106,7 +115,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route }) => {
         </View>
 
         {/* Absolute Bottom Elements */}
-        <PushToTalkButton state={talkState} onPress={onTalkPress} />
+        <PushToTalkButton state={talkState} onPressIn={onTalkPressIn} onPressOut={onTalkPressOut} />
         
         <BottomControls
           memberChannelCount={membersInChannel}

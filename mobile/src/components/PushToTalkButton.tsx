@@ -41,7 +41,7 @@ const iconMap: Record<TalkState, string> = {
   speaking_other: 'headphones',
 }
 
-const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({ state, onPress }) => {
+const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({ state, onPressIn, onPressOut }) => {
   const isBusy = state === 'speaking_other';
   const config = statusMap[state];
 
@@ -52,8 +52,8 @@ const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({ state, onPress }) =
       </Text>
       
       <TouchableOpacity
-        onPressIn={onPress}
-        onPressOut={onPress} 
+        onPressIn={onPressIn}
+        onPressOut={onPressOut} 
         disabled={isBusy}
         activeOpacity={0.8}
         className={`w-32 h-32 rounded-full items-center justify-center border-2 ${config.main} z-10 ${config.glow} transition-transform duration-200 ${state === 'speaking_self' ? 'scale-105' : ''}`}

@@ -6,5 +6,8 @@ export type RootStackParamList = {
     room: Room,
     members: User[]
   };
-  Members?: undefined;
+  Members: {
+    room: Room,
+    members: User[]
+  };
 };
