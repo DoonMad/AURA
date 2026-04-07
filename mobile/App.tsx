@@ -8,6 +8,7 @@ import RoomScreen from './src/screens/RoomScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import type { RootStackParamList } from './src/types/navigation';
+import MembersScreen from './src/screens/MembersScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -52,6 +53,10 @@ export default function App() {
           <Stack.Screen
             name="Room"
             component={RoomScreen}
+          />
+          <Stack.Screen
+            name="Members"
+            component={MembersScreen}
           />
         </Stack.Navigator>
       </NavigationContainer>

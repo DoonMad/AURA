@@ -37,7 +37,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route, navigation }) => {
   const totalMembers = members.length;
   
   const activeSpeakerId = selectedChannel?.activeSpeaker;
-  const activeSpeakerName = members.find(m => m.id === activeSpeakerId)?.name ?? null;
+  const activeSpeaker = members.find(m => m.id === activeSpeakerId) ?? null;
 
   const onMembersPress = () => {
     navigation.navigate('Members', { room, members })
@@ -106,7 +106,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route, navigation }) => {
           <View style={{ flex: 1.5 }} />
 
           <SpeakerArea 
-            speakerName={activeSpeakerName} 
+            speakerName={activeSpeaker?.name ?? null} 
             isActive={talkState === 'speaking_other' || talkState === 'speaking_self'} 
           />
 
