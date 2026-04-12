@@ -24,18 +24,31 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const firstChannel = channels[0]
   const [selectedChannelId, setSelectedChannelId] = useState<string>(firstChannel?.id ?? '')
 
-  const [talkState, setTalkState] = useState<'idle' | 'ready' | 'speaking_self' | 'speaking_other'>('idle')
   const [volume, setVolume] = useState(0.5)
   const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'disconnected'>('connected')
 
+  // Listen for real-time room updates from the backend
   useEffect(() => {
-    if (!room) return
-    const parsedChannels: Channel[] = Object.values(room.channels)
-    setChannels(parsedChannels)
-    if (parsedChannels.length > 0 && !selectedChannelId) {
-      setSelectedChannelId(parsedChannels[0].id)
+    if (!socket) return;
+
+    const handleRoomUpdated = (data: { room: any; users: any[] }) => {
+      useAppStore.getState().setRoom(data.room);
+      useAppStore.getState().setMembers(data.users);
+    };
+
+    socket.on('roomUpdated', handleRoomUpdated);
+
+    return () => {
+      socket.off('roomUpdated', handleRoomUpdated);
+    };
+  }, [socket]);
+
+  // Default channel if none selected
+  useEffect(() => {
+    if (channels.length > 0 && !selectedChannelId) {
+      setSelectedChannelId(channels[0].id);
     }
-  }, [room?.channels])
+  }, [channels, selectedChannelId]);
 
   // ── Derived state ──
   const selectedChannel = channels?.find((c) => c.id === selectedChannelId)
@@ -46,6 +59,13 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
 
   const activeSpeakerId = selectedChannel?.activeSpeaker
   const activeSpeaker = useMemberById(activeSpeakerId)
+
+  let talkState: 'idle' | 'ready' | 'speaking_self' | 'speaking_other' = 'idle';
+  if (activeSpeakerId && activeSpeakerId === deviceId) {
+    talkState = 'speaking_self';
+  } else if (activeSpeakerId) {
+    talkState = 'speaking_other';
+  }
 
   // ── Handlers ──
   const onMembersPress = () => {
@@ -63,11 +83,13 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   }
 
   const onTalkPressIn = () => {
-    setTalkState('ready')
+    if (!socket || !room || !deviceId || !selectedChannelId) return;
+    socket.emit('requestMic', { deviceId, roomId: room.id, channelId: selectedChannelId });
   }
 
   const onTalkPressOut = () => {
-    setTalkState('idle')
+    if (!socket || !room || !deviceId || !selectedChannelId) return;
+    socket.emit('releaseMic', { deviceId, roomId: room.id, channelId: selectedChannelId });
   }
 
   const onPrevChannel = () => {

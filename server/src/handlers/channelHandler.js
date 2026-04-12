@@ -1,4 +1,5 @@
 import { getRoom } from "../repositories/roomRepository.js";
+import { getUsersInRoom } from "../repositories/userRepository.js";
 
 export default function registerChannelEventHandlers (socket, io) {
     socket.on("joinChannel", ({deviceId, roomId, channelId}) => {
@@ -19,6 +20,7 @@ export default function registerChannelEventHandlers (socket, io) {
         channel.addMember(deviceId);
         socket.join(roomId + ":" + channelId);
         socket.emit("channelJoined", { room, channel });
+        io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });
 
         console.log(deviceId, "joined channel", channelId, "in room", roomId);
     });
@@ -41,6 +43,7 @@ export default function registerChannelEventHandlers (socket, io) {
         channel.removeMember(deviceId);
         socket.leave(roomId + ":" + channelId);
         socket.emit("channelLeft", { room, channel });
+        io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });
 
         console.log(deviceId, "left channel", channelId, "in room", roomId);
     });

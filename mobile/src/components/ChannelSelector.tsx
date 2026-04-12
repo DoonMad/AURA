@@ -36,7 +36,7 @@ const ChannelSelector: React.FC<ChannelSelectorProps> = ({
 
         <View className="items-center justify-center flex-1 px-4">
           <Text 
-            className={`text-2xl font-black text-center tracking-wider ${isActive ? 'text-primary drop-shadow-md' : 'text-white'}`}
+            className={`text-2xl font-black text-center tracking-wider ${isActive ? 'text-primary' : 'text-white'}`}
             numberOfLines={1}
             adjustsFontSizeToFit
           >

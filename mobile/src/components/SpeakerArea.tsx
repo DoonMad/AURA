@@ -14,7 +14,7 @@ const SpeakerArea: React.FC<SpeakerAreaProps> = ({ speakerName, isActive = false
 
   // Dynamic styling based on activity
   const iconColor = isSpeaking ? '#FCC1C1' : '#8B8A93';
-  const iconBg = isSpeaking ? 'bg-red-500/20 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-surface border-aura-border';
+  const iconBg = isSpeaking ? 'bg-red-500/20 border-red-500/50 shadow-lg shadow-red-500' : 'bg-surface border-aura-border';
   const waveColor = isSpeaking ? 'bg-red-500' : 'bg-aura-border';
 
   return (

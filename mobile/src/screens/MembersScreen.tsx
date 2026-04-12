@@ -12,33 +12,15 @@ const MembersScreen: React.FC<MembersScreenProps> = ({ navigation }) => {
   const deviceId = useAppStore((s) => s.deviceId)
   const members = useMembersArray()
 
-  const showAdminControls = room?.admins.includes(deviceId ?? '') ?? false
-
-  const onCreateChannel = () => {
-    // TODO: Implement
-  }
-
-  const onRenameChannel = () => {
-    // TODO: Implement
-  }
-
-  // For visual demo if empty
-  const firstChannel = room ? Object.values(room.channels)[0] : undefined;
-  const channelMemberIds = firstChannel ? firstChannel.members : [];
-  const mappedChannelMembers = channelMemberIds
+  // Find the channel the user is currently in
+  const activeChannel = room 
+    ? Object.values(room.channels).find(ch => ch.members.includes(deviceId ?? '')) 
+    : undefined;
+  
+  // Resolve member IDs to User objects for the active channel
+  const currentChannelMembers = activeChannel?.members
     .map(id => members.find(m => m.id === id))
-    .filter((m): m is User => m !== undefined);
-
-  const defaultChannelMembers: User[] = mappedChannelMembers.length ? mappedChannelMembers : [
-    { id: '1', name: 'Alpha Leader', isSpeaking: true, roomId: room?.id ?? '' },
-    { id: '2', name: 'Bravo Six', isSpeaking: false, roomId: room?.id ?? '' },
-  ];
-
-  const defaultAllMembers: User[] = members.length ? members : [
-    { id: '3', name: 'Delta Actual', isSpeaking: false, roomId: room?.id ?? '' },
-    { id: '4', name: 'Echo Base', isSpeaking: false, roomId: room?.id ?? '' },
-    ...defaultChannelMembers
-  ];
+    .filter((m): m is User => m !== undefined) || [];
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
@@ -52,41 +34,29 @@ const MembersScreen: React.FC<MembersScreenProps> = ({ navigation }) => {
 
       <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
         
-        {showAdminControls && (
-          <View className="bg-surface border border-primary/30 rounded-2xl p-4 mb-6 relative overflow-hidden">
-            <View className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -mr-16 -mt-16" />
-            <Text className="text-xs uppercase font-bold text-primary tracking-widest mb-4">Command Controls</Text>
-            
-            <View className="flex-row space-x-4">
-              <TouchableOpacity onPress={onCreateChannel} className="flex-1 bg-primary/20 border border-primary/50 py-3 rounded-xl items-center flex-row justify-center">
-                <Icon name="plus-circle" size={16} color="#A78BFA" />
-                <Text className="text-primary font-bold ml-2">New Channel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity onPress={onRenameChannel} className="flex-1 bg-surface-light border border-aura-muted/30 py-3 rounded-xl items-center flex-row justify-center">
-                <Icon name="edit-2" size={16} color="#EEEDF2" />
-                <Text className="text-white font-bold ml-2">Rename</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
+        {/* Active Channel Members */}
         <View className="mb-6">
           <View className="flex-row items-center mb-3">
             <Icon name="radio" size={18} color="#7C5CFC" />
-            <Text className="text-sm font-bold text-primary uppercase tracking-widest ml-2">Active Channel</Text>
+            <Text className="text-sm font-bold text-primary uppercase tracking-widest ml-2">
+              Active Channel {activeChannel ? `- ${activeChannel.name}` : ''}
+            </Text>
           </View>
-          {defaultChannelMembers.map((member) => (
+          {currentChannelMembers.map((member) => (
             <MemberListItem key={member.id} name={member.name} isSpeaking={member.isSpeaking} />
           ))}
+          {currentChannelMembers.length === 0 && (
+            <Text className="text-aura-muted/50 italic ml-7 text-sm">No members in channel.</Text>
+          )}
         </View>
 
+        {/* All Room Members */}
         <View className="mb-10">
           <View className="flex-row items-center mb-3">
             <Icon name="users" size={18} color="#8B8A93" />
             <Text className="text-sm font-bold text-aura-muted uppercase tracking-widest ml-2">All Personnel</Text>
           </View>
-          {defaultAllMembers.map((member) => (
+          {members.map((member) => (
             <MemberListItem key={member.id} name={member.name} isSpeaking={member.isSpeaking} />
           ))}
         </View>

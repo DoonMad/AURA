@@ -10,7 +10,9 @@ export default function registerRoomEventHandlers (socket, io) {
 
         socket.join(room.id);
         socket.join(room.id + ":" + room.channels["channel-1"].id);
+        
         socket.emit("roomJoined", { room, users: getUsersInRoom(room.id) });
+        io.to(room.id).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
 
         console.log(displayName, deviceId, "created a room ", room);
     });
@@ -29,7 +31,9 @@ export default function registerRoomEventHandlers (socket, io) {
 
         socket.join(roomId);
         socket.join(roomId + ":" + room.channels["channel-1"].id);
+        
         socket.emit("roomJoined", { room, users: getUsersInRoom(room.id) });
+        io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
 
         console.log(displayName, deviceId, "joined room", roomId);
     });
@@ -50,7 +54,8 @@ export default function registerRoomEventHandlers (socket, io) {
         }
 
         socket.leave(roomId);
-        socket.emit("roomLeft", { room, users: getUsersInRoom(room.id) });
+        socket.emit("roomLeft", { roomId });
+        io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
 
         console.log(displayName, deviceId, "left room", roomId);
     });

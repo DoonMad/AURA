@@ -20,14 +20,14 @@ const statusMap: Record<TalkState, { main: string; glow: string; icon: string; t
   },
   speaking_self: {
     main: 'bg-green-500 border-green-400',
-    glow: 'shadow-[0_0_30px_rgba(34,197,94,0.6)]',
+    glow: 'shadow-lg shadow-green-400',
     icon: '#FFFFFF',
     text: 'text-green-400',
     label: 'TRANSMITTING'
   },
   speaking_other: {
     main: 'bg-red-500 border-red-400',
-    glow: 'shadow-[0_0_20px_rgba(239,68,68,0.5)]',
+    glow: 'shadow-md shadow-red-500',
     icon: '#FFFFFF',
     text: 'text-red-400',
     label: 'RECEIVING'
