@@ -7,7 +7,7 @@ const BACKEND_URL = Platform.OS === 'android'
 ? 'http://10.0.2.2:3000' 
 : 'http://localhost:3000';
 
-const createIOConnection = () => {
+const getSocket = () => {
     if (!socket) {
         socket = io(BACKEND_URL, {
             transports: ["websocket", "polling"],
@@ -29,4 +29,4 @@ const createIOConnection = () => {
     return socket;
 };
 
-export default createIOConnection;
+export default getSocket;

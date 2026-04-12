@@ -7,48 +7,58 @@ import PushToTalkButton from '../components/PushToTalkButton'
 import BottomControls from '../components/BottomControls'
 import ChannelSelector from '../components/ChannelSelector'
 import type { Channel, RoomScreenProps } from '../types'
+import useAppStore, { useCurrentUser, useMemberById, useMembersArray } from '../store/useAppStore'
 
-const RoomScreen: React.FC<RoomScreenProps> = ({ route, navigation }) => {
-  const { room, members } = route.params
+const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
+  // ── Read from the global store (no more route.params!) ──
+  const room = useAppStore((s) => s.room)
+  const socket = useAppStore((s) => s.socket)
+  const deviceId = useAppStore((s) => s.deviceId)
+  const members = useMembersArray()
+  const currentUser = useCurrentUser()
 
-  const [roomName, setRoomName] = useState(room.id)
-  const [channels, setChannels] = useState<Channel[]>(Object.values(room.channels))
-  
-  const firstChannel = channels[0];
+  // ── Local UI state ──
+  const [channels, setChannels] = useState<Channel[]>(
+    room ? Object.values(room.channels) : []
+  )
+  const firstChannel = channels[0]
   const [selectedChannelId, setSelectedChannelId] = useState<string>(firstChannel?.id ?? '')
-  
+
   const [talkState, setTalkState] = useState<'idle' | 'ready' | 'speaking_self' | 'speaking_other'>('idle')
   const [volume, setVolume] = useState(0.5)
   const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'disconnected'>('connected')
 
   useEffect(() => {
-    const parsedChannels: Channel[] = Object.values(room.channels);
-    setChannels(parsedChannels);
+    if (!room) return
+    const parsedChannels: Channel[] = Object.values(room.channels)
+    setChannels(parsedChannels)
     if (parsedChannels.length > 0 && !selectedChannelId) {
-      setSelectedChannelId(parsedChannels[0].id);
+      setSelectedChannelId(parsedChannels[0].id)
     }
-  }, [room.channels]); // Removed selectedChannelId as dependency to avoid infinite loops
+  }, [room?.channels])
 
-  // Derived state (no need for useState)
-  const selectedChannel = channels?.find((c) => c.id === selectedChannelId);
-  const currentIndex = channels.findIndex(ch => ch.id === selectedChannelId);
-  
-  const membersInChannel = selectedChannel?.members?.length ?? 0;
-  const totalMembers = members.length;
-  
-  const activeSpeakerId = selectedChannel?.activeSpeaker;
-  const activeSpeaker = members.find(m => m.id === activeSpeakerId) ?? null;
+  // ── Derived state ──
+  const selectedChannel = channels?.find((c) => c.id === selectedChannelId)
+  const currentIndex = channels.findIndex(ch => ch.id === selectedChannelId)
 
+  const membersInChannel = selectedChannel?.members?.length ?? 0
+  const totalMembers = members.length
+
+  const activeSpeakerId = selectedChannel?.activeSpeaker
+  const activeSpeaker = useMemberById(activeSpeakerId)
+
+  // ── Handlers ──
   const onMembersPress = () => {
-    navigation.navigate('Members', { room, members })
+    // No params needed — MembersScreen reads from the store
+    navigation.navigate('Members')
   }
 
   const onLeavePress = () => {
-    // TODO: Implement
+    // TODO: Implement — emit leaveRoom, call clearSession(), navigate back
   }
 
   const onSharePress = () => {
-    console.log('Share room:', room.id)
+    if (room) console.log('Share room:', room.id)
     // TODO: open share sheet with room link or code
   }
 
@@ -61,20 +71,20 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route, navigation }) => {
   }
 
   const onPrevChannel = () => {
-    if (channels.length === 0) return
+    if (channels.length === 0 || !socket || !deviceId || !room) return
     const idx = channels.findIndex(ch => ch.id === selectedChannelId)
     const prevIdx = idx <= 0 ? channels.length - 1 : idx - 1
+    socket.emit("leaveChannel", { deviceId, roomId: room.id, channelId: selectedChannelId })
     setSelectedChannelId(channels[prevIdx].id)
   }
 
   const onNextChannel = () => {
-    if (channels.length === 0) return
+    if (channels.length === 0 || !socket || !deviceId || !room) return
     const idx = channels.findIndex(ch => ch.id === selectedChannelId)
     const nextIdx = idx === -1 || idx === channels.length - 1 ? 0 : idx + 1
+    socket.emit("joinChannel", { deviceId, roomId: room.id, channelId: channels[nextIdx].id })
     setSelectedChannelId(channels[nextIdx].id)
   }
-
-
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
@@ -82,7 +92,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ route, navigation }) => {
       <View className="flex-1 relative">
         {/* Header - Stays glued to top */}
         <RoomHeader 
-          roomName={roomName} 
+          roomName={room?.id ?? 'Loading...'} 
           connectionState={connectionState} 
           onSharePress={onSharePress} 
         />

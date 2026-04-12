@@ -1,13 +1,12 @@
-import { Room, User } from "./models";
+/**
+ * Navigation type definitions.
+ *
+ * Screen params are `undefined` because all shared data (room, members,
+ * deviceId) now lives in the Zustand store — no more prop drilling.
+ */
 
 export type RootStackParamList = {
-  Entry: { deviceId: string };
-  Room: {
-    room: Room,
-    members: User[]
-  };
-  Members: {
-    room: Room,
-    members: User[]
-  };
+  Entry: undefined;
+  Room: undefined;
+  Members: undefined;
 };

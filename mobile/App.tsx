@@ -5,25 +5,37 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import EntryScreen from './src/screens/EntryScreen';
 import RoomScreen from './src/screens/RoomScreen';
+import MembersScreen from './src/screens/MembersScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import type { RootStackParamList } from './src/types/navigation';
-import MembersScreen from './src/screens/MembersScreen';
+import useAppStore from './src/store/useAppStore';
+import getSocket from './src/services/socket';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const init = async () => {
+      // ── Load or create deviceId ──
       let id = await AsyncStorage.getItem('deviceId');
       if (!id) {
         id = uuid.v4();
         await AsyncStorage.setItem('deviceId', id);
       }
-      setDeviceId(id);
+
+      // ── Load saved displayName (may be null on first launch) ──
+      const savedName = await AsyncStorage.getItem('displayName');
+
+      // ── Seed the Zustand store ──
+      useAppStore.getState().setIdentity(id, savedName);
+
+      // ── Create the socket connection once and store it globally ──
+      const socket = getSocket();
+      useAppStore.getState().setSocket(socket);
+
       setIsReady(true);
     };
 
@@ -33,7 +45,7 @@ export default function App() {
     });
   }, []);
 
-  if (!isReady || !deviceId) {
+  if (!isReady) {
     return null;
   }
 
@@ -48,7 +60,6 @@ export default function App() {
           <Stack.Screen
             name="Entry"
             component={EntryScreen}
-            initialParams={{ deviceId }}
           />
           <Stack.Screen
             name="Room"

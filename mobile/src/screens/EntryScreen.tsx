@@ -17,67 +17,69 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import TextInputField from '../components/TextInputField';
 import PrimaryButton from '../components/PrimaryButton';
 import SectionDivider from '../components/SectionDivider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import createIOConnection from '../services/socket';
-import type { RootStackParamList, EntryScreenProps, Room, User } from '../types';
+import type { EntryScreenProps, Room, User } from '../types';
+import useAppStore from '../store/useAppStore';
 
-const EntryScreen: React.FC<EntryScreenProps> = ({ route, navigation }) => {
-  const { deviceId } = route.params;
-  const [displayName, setDisplayName] = useState("");
-  const [roomId, setRoomId] = useState("");
+const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
+  // ── Read identity from the global store ──
+  const deviceId = useAppStore((s) => s.deviceId);
+  const socket = useAppStore((s) => s.socket);
+  const storedDisplayName = useAppStore((s) => s.displayName);
+
+  // Local state for the text input (so typing doesn't write to store on every keystroke)
+  const [displayName, setDisplayName] = useState(storedDisplayName ?? '');
+  const [roomId, setRoomId] = useState('');
+
+  // If the store already has a saved displayName, pre-fill the input
+  useEffect(() => {
+    if (storedDisplayName) {
+      setDisplayName(storedDisplayName);
+    }
+  }, [storedDisplayName]);
 
   useEffect(() => {
-    const getDisplayName = async () => {
-      let name = await AsyncStorage.getItem('displayName');
-      if (name) {
-        setDisplayName(name);
-      }
-    };
-
-    getDisplayName();
-  }, []);
-
-  useEffect(() => {
-    const socket = createIOConnection();
-
-    // const handleRoomCreated = (room: any) => {
-    //   console.log('Room created:', room.id);
-    //   navigation.navigate('Room', { roomId: room.id });
-    // };
+    if (!socket) return;
 
     const handleRoomJoined = (data: { room: Room; users: User[] }) => {
       console.log('Room joined:', data.room);
-      navigation.navigate('Room', { room: data.room, members: data.users });
+
+      // ── Write to the global store ──
+      useAppStore.getState().setRoom(data.room);
+      useAppStore.getState().setMembers(data.users);
+
+      // Navigate without passing any params — RoomScreen reads from the store
+      navigation.navigate('Room');
     };
 
     const handleError = (error: any) => {
       console.warn('Socket error:', error);
     };
 
-    // socket.on('roomCreated', handleRoomCreated);
     socket.on('roomJoined', handleRoomJoined);
     socket.on('error', handleError);
 
     return () => {
-      // socket.off('roomCreated', handleRoomCreated);
       socket.off('roomJoined', handleRoomJoined);
       socket.off('error', handleError);
     };
-  }, [navigation]);
+  }, [socket, navigation]);
 
   const handleJoinRoom = async () => {
     if (!displayName) {
       console.warn('Please enter a display name');
       return;
     }
+    if (!socket || !deviceId) return;
     if (roomId && roomId.length === 6) {
-      const socket = createIOConnection();
-      socket.emit('joinRoom', { deviceId, displayName, roomId });
+      // Commit displayName to store + AsyncStorage
+      useAppStore.getState().setDisplayName(displayName);
       await AsyncStorage.setItem('displayName', displayName);
+
+      socket.emit('joinRoom', { deviceId, displayName, roomId });
     }
   };
 
@@ -86,12 +88,14 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ route, navigation }) => {
       console.warn('Please enter a display name');
       return;
     }
-    const socket = createIOConnection();
-    socket.emit('createRoom', { deviceId, displayName });
+    if (!socket || !deviceId) return;
+
+    // Commit displayName to store + AsyncStorage
+    useAppStore.getState().setDisplayName(displayName);
     await AsyncStorage.setItem('displayName', displayName);
+
+    socket.emit('createRoom', { deviceId, displayName });
   };
-
-
 
   return (
     <SafeAreaView className="flex-1 bg-background">
