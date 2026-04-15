@@ -1,5 +1,5 @@
 import { getRoom } from "../repositories/roomRepository.js";
-import { getUsersInRoom } from "../repositories/userRepository.js";
+import { getUser, getUsersInRoom } from "../repositories/userRepository.js";
 
 export default function registerChannelEventHandlers (socket, io) {
     socket.on("joinChannel", ({deviceId, roomId, channelId}) => {
@@ -17,7 +17,22 @@ export default function registerChannelEventHandlers (socket, io) {
             return;
         }
 
+        const user = getUser(deviceId);
+        if (user?.currentChannelId) {
+            const previousChannel = room.getChannel(user.currentChannelId);
+            if (previousChannel) {
+                previousChannel.removeMember(deviceId);
+                if (previousChannel.activeSpeaker === deviceId) {
+                    previousChannel.activeSpeaker = null;
+                }
+            }
+            socket.leave(roomId + ":" + user.currentChannelId);
+        }
+
         channel.addMember(deviceId);
+        if (user) {
+            user.currentChannelId = channelId;
+        }
         socket.join(roomId + ":" + channelId);
         socket.emit("channelJoined", { room, channel });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });
@@ -41,6 +56,13 @@ export default function registerChannelEventHandlers (socket, io) {
         }
 
         channel.removeMember(deviceId);
+        if (channel.activeSpeaker === deviceId) {
+            channel.activeSpeaker = null;
+        }
+        const user = getUser(deviceId);
+        if (user && user.currentChannelId === channelId) {
+            user.currentChannelId = null;
+        }
         socket.leave(roomId + ":" + channelId);
         socket.emit("channelLeft", { room, channel });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });

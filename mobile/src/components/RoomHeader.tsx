@@ -14,6 +14,10 @@ export interface ExtendedRoomHeaderProps extends RoomHeaderProps {
 }
 
 const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionState, onSharePress }) => {
+  const roomSlug = typeof roomName === 'string'
+    ? roomName.toLowerCase().replace(/\s+/g, '')
+    : 'loading';
+
   return (
     <View className="flex-row items-center justify-between px-aura-xl py-aura-lg bg-surface/90 border-b border-aura-border z-30 w-full pt-12 shadow-lg backdrop-blur-md">
       {/* Title & Connection Dot */}
@@ -23,7 +27,7 @@ const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionSta
           <View className="flex-row items-center mt-1">
             <View className={`w-2 h-2 rounded-full mr-2 ${statusDot[connectionState]}`} />
             <Text className="text-[10px] text-aura-muted uppercase tracking-widest font-bold">
-              #{roomName?.toLowerCase().replace(/\s+/g, '')}
+              #{roomSlug}
             </Text>
           </View>
         </View>

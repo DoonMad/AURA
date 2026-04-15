@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import RoomHeader from '../components/RoomHeader'
@@ -6,8 +6,8 @@ import SpeakerArea from '../components/SpeakerArea'
 import PushToTalkButton from '../components/PushToTalkButton'
 import BottomControls from '../components/BottomControls'
 import ChannelSelector from '../components/ChannelSelector'
-import type { Channel, RoomScreenProps } from '../types'
-import useAppStore, { useCurrentUser, useMemberById, useMembersArray } from '../store/useAppStore'
+import type { RoomScreenProps } from '../types'
+import useAppStore, { useMemberById, useMembersArray } from '../store/useAppStore'
 
 const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   // ── Read from the global store (no more route.params!) ──
@@ -15,37 +15,46 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const socket = useAppStore((s) => s.socket)
   const deviceId = useAppStore((s) => s.deviceId)
   const members = useMembersArray()
-  const currentUser = useCurrentUser()
+ 
 
   // ── Local UI state ──
-  const [channels, setChannels] = useState<Channel[]>(
-    room ? Object.values(room.channels) : []
-  )
-  const firstChannel = channels[0]
-  const [selectedChannelId, setSelectedChannelId] = useState<string>(firstChannel?.id ?? '')
+  const channels = room ? Object.values(room.channels) : []
+  const [selectedChannelId, setSelectedChannelId] = useState<string>('')
 
   const [volume, setVolume] = useState(0.5)
-  const [connectionState, setConnectionState] = useState<'connected' | 'reconnecting' | 'disconnected'>('connected')
+  const connectionState: 'connected' | 'reconnecting' | 'disconnected' = 'connected'
 
   // Listen for real-time room updates from the backend
   useEffect(() => {
     if (!socket) return;
 
     const handleRoomUpdated = (data: { room: any; users: any[] }) => {
+      if (!data?.room || !Array.isArray(data.users)) return;
+
       useAppStore.getState().setRoom(data.room);
       useAppStore.getState().setMembers(data.users);
     };
 
+    const handleRoomLeft = () => {
+      useAppStore.getState().clearSession();
+      navigation.navigate('Entry');
+    };
+
     socket.on('roomUpdated', handleRoomUpdated);
+    socket.on('roomLeft', handleRoomLeft);
 
     return () => {
       socket.off('roomUpdated', handleRoomUpdated);
+      socket.off('roomLeft', handleRoomLeft);
     };
-  }, [socket]);
+  }, [socket, navigation]);
 
   // Default channel if none selected
   useEffect(() => {
-    if (channels.length > 0 && !selectedChannelId) {
+    if (channels.length === 0) return;
+
+    const selectedStillExists = channels.some((channel) => channel.id === selectedChannelId);
+    if (!selectedChannelId || !selectedStillExists) {
       setSelectedChannelId(channels[0].id);
     }
   }, [channels, selectedChannelId]);
@@ -74,7 +83,10 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   }
 
   const onLeavePress = () => {
-    // TODO: Implement — emit leaveRoom, call clearSession(), navigate back
+    if (!socket || !room || !deviceId || !selectedChannelId) return
+    socket.emit('leaveRoom', { deviceId, roomId: room.id, channelId: selectedChannelId })
+    useAppStore.getState().clearSession()
+    navigation.navigate('Entry')
   }
 
   const onSharePress = () => {

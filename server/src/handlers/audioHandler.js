@@ -7,15 +7,21 @@ export default function registerAudioEventHandlers (socket, io) {
         if (!room) return;
         const channel = room.getChannel(channelId);
         if (!channel) return;
+        const user = getUser(deviceId);
+        if (!user || user.roomId !== roomId || user.currentChannelId !== channelId) {
+            socket.emit("micDenied", { roomId, channelId, reason: "not-in-channel" });
+            return;
+        }
 
         // Only assign mic if it's free
         if (channel.activeSpeaker === null) {
             channel.activeSpeaker = deviceId;
-            const user = getUser(deviceId);
             if (user) user.isSpeaking = true;
 
             io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });
             console.log(deviceId, "took mic in room", roomId, "channel", channelId);
+        } else if (channel.activeSpeaker !== deviceId) {
+            socket.emit("micDenied", { roomId, channelId, reason: "busy" });
         }
     });
 
@@ -24,11 +30,14 @@ export default function registerAudioEventHandlers (socket, io) {
         if (!room) return;
         const channel = room.getChannel(channelId);
         if (!channel) return;
+        const user = getUser(deviceId);
+        if (!user || user.roomId !== roomId || user.currentChannelId !== channelId) {
+            return;
+        }
 
         // Only release if this user actually holds the mic
         if (channel.activeSpeaker === deviceId) {
             channel.activeSpeaker = null;
-            const user = getUser(deviceId);
             if (user) user.isSpeaking = false;
 
             io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });

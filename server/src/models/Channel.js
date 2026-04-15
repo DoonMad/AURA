@@ -6,11 +6,13 @@ export default class Channel {
         this.activeSpeaker = null;
     }
 
-    addMember(user) {
-        this.members.push(user.id)
+    addMember(deviceId) {
+        if (!this.members.includes(deviceId)) {
+            this.members.push(deviceId);
+        }
     }
 
-    removeMember(user) {
-        this.members.pop(user.id)
+    removeMember(deviceId) {
+        this.members = this.members.filter((memberId) => memberId !== deviceId);
     }
 }

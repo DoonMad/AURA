@@ -1,12 +1,36 @@
 import { getRoom, createRoom, removeRoom } from "../repositories/roomRepository.js";
-import { removeUser, getUsersInRoom, createUser } from "../repositories/userRepository.js";
+import { removeUser, getUsersInRoom, createUser, getUser } from "../repositories/userRepository.js";
+
+function addUserToChannel(room, channelId, deviceId) {
+    const channel = room.getChannel(channelId);
+    if (!channel) {
+        return null;
+    }
+
+    channel.addMember(deviceId);
+    const user = getUser(deviceId);
+    if (user) {
+        user.currentChannelId = channelId;
+    }
+    return channel;
+}
+
+function removeUserFromRoom(room, deviceId) {
+    room.removeMember(deviceId);
+    for (const channel of Object.values(room.channels)) {
+        channel.removeMember(deviceId);
+        if (channel.activeSpeaker === deviceId) {
+            channel.activeSpeaker = null;
+        }
+    }
+}
 
 export default function registerRoomEventHandlers (socket, io) {
     socket.on("createRoom", ({deviceId, displayName}) => {
         const room = createRoom(deviceId);
         room.addMember(deviceId);
-        room.channels["channel-1"].addMember(deviceId);
-        createUser(deviceId, displayName, room.id);
+        createUser(deviceId, displayName, room.id, socket.id);
+        addUserToChannel(room, "channel-1", deviceId);
 
         socket.join(room.id);
         socket.join(room.id + ":" + room.channels["channel-1"].id);
@@ -26,8 +50,8 @@ export default function registerRoomEventHandlers (socket, io) {
         }
 
         room.addMember(deviceId);
-        room.channels["channel-1"].addMember(deviceId);
-        createUser(deviceId, displayName, roomId);
+        createUser(deviceId, displayName, roomId, socket.id);
+        addUserToChannel(room, "channel-1", deviceId);
 
         socket.join(roomId);
         socket.join(roomId + ":" + room.channels["channel-1"].id);
@@ -42,22 +66,27 @@ export default function registerRoomEventHandlers (socket, io) {
         const room = getRoom(roomId);
         if (!room) {
             socket.emit("error", { message: "Room not found" });
-            console.log(displayName, deviceId, "failed to leave room", roomId, "(not found)");
+            console.log(deviceId, "failed to leave room", roomId, "(not found)");
             return;
         }
 
-        room.removeMember(deviceId);
-        room.channels[channelId].removeMember(deviceId);
+        const user = getUser(deviceId);
+        const currentChannelId = channelId || user?.currentChannelId;
+
+        removeUserFromRoom(room, deviceId);
         removeUser(deviceId);
         if(room.members.length === 0) {
             removeRoom(roomId);
         }
 
         socket.leave(roomId);
+        if (currentChannelId) {
+            socket.leave(roomId + ":" + currentChannelId);
+        }
         socket.emit("roomLeft", { roomId });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
 
-        console.log(displayName, deviceId, "left room", roomId);
+        console.log(deviceId, "left room", roomId);
     });
 }
     

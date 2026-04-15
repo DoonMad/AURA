@@ -6,13 +6,21 @@ export function getUser(deviceId) {
     return users.get(deviceId);
 }
 
-export function createUser(deviceId, displayName, roomId) {
+export function getUserBySocketId(socketId) {
+    return Array.from(users.values()).find((user) => user.socketId === socketId);
+}
+
+export function createUser(deviceId, displayName, roomId, socketId = null) {
     let user = users.get(deviceId);
     if (user) {
+        user.name = displayName;
         user.roomId = roomId;
+        user.socketId = socketId;
+        user.currentChannelId = null;
+        user.isSpeaking = false;
     } 
     else {
-        user = new User(displayName, deviceId, roomId);
+        user = new User(displayName, deviceId, roomId, socketId);
         users.set(deviceId, user);
     }
 }
