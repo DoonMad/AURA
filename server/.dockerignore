@@ -1,6 +1,5 @@
-mobile/
-server/node_modules
-server/.env
+node_modules
+npm-debug.log
+.env
 .git
 .gitignore
-*.md

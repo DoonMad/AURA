@@ -2,8 +2,6 @@ app = "aura-command-backend"
 primary_region = "bom"
 
 [build]
-  dockerfile = "server/Dockerfile"
-  ignorefile = "server/.dockerignore"
 
 [env]
   MEDIASOUP_RTC_MIN_PORT = "40000"

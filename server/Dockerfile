@@ -10,10 +10,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY server/package.json server/package-lock.json* ./
+COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
-COPY server/ .
+COPY . .
 
 # ── Production stage: slim runtime ──
 FROM node:20-bookworm-slim
