@@ -1,0 +1,6 @@
+mobile/
+server/node_modules
+server/.env
+.git
+.gitignore
+*.md

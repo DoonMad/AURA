@@ -13,14 +13,29 @@ const AUDIO_MEDIA_CODECS = [
   }
 ];
 
-function buildListenIps() {
-  const announcedIp = process.env.MEDIASOUP_ANNOUNCED_IP;
+import os from "os";
 
-  if (announcedIp) {
-    return [{ ip: "0.0.0.0", announcedIp }];
+function getLocalIp() {
+  // Fly.io provides the public IP automatically
+  if (process.env.FLY_PUBLIC_IP) {
+    return process.env.FLY_PUBLIC_IP;
   }
 
-  return [{ ip: "0.0.0.0" }];
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return "127.0.0.1";
+}
+
+function buildListenIps() {
+  const announcedIp = process.env.MEDIASOUP_ANNOUNCED_IP || getLocalIp();
+  console.log("[mediasoup] using announcedIp:", announcedIp);
+  return [{ ip: "0.0.0.0", announcedIp }];
 }
 
 function createChannelRoomKey(roomId, channelId) {
