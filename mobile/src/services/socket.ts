@@ -1,17 +1,15 @@
 import { io, Socket } from "socket.io-client";
-import { Platform } from "react-native";
+import { BACKEND_URL } from "../config/network";
 
 let socket: Socket | null = null;
-
-const BACKEND_URL = Platform.OS === 'android' 
-? 'http://10.0.2.2:3000' 
-: 'http://localhost:3000';
+console.log("Socket backend URL:", BACKEND_URL);
 
 const getSocket = () => {
     if (!socket) {
         socket = io(BACKEND_URL, {
-            transports: ["websocket", "polling"],
+            transports: ["polling", "websocket"],
             autoConnect: true,
+            timeout: 10000,
         });
 
         socket.on("connect", () => {

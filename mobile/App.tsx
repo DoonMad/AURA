@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import EntryScreen from './src/screens/EntryScreen';
 import RoomScreen from './src/screens/RoomScreen';
 import MembersScreen from './src/screens/MembersScreen';
+import MicTesterScreen from './src/screens/MicTesterScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import type { RootStackParamList } from './src/types/navigation';
@@ -68,6 +69,10 @@ export default function App() {
           <Stack.Screen
             name="Members"
             component={MembersScreen}
+          />
+          <Stack.Screen
+            name="MicTester"
+            component={MicTesterScreen}
           />
         </Stack.Navigator>
       </NavigationContainer>

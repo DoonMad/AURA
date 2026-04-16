@@ -168,6 +168,15 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
                 variant="outline"
               />
             </View>
+
+            {/* Hardware Debug Button */}
+            <View className="mt-8">
+              <PrimaryButton
+                title="Debug Hardware Mic"
+                onPress={() => navigation.navigate('MicTester')}
+                variant="outline"
+              />
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

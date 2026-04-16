@@ -1,8 +1,10 @@
 import { getRoom } from "../repositories/roomRepository.js";
 import { getUser, getUsersInRoom } from "../repositories/userRepository.js";
+import mediasoupManager from "../mediasoup/mediasoupManager.js";
+import { createChannelRoomKey } from "./mediasoupHandler.js";
 
 export default function registerChannelEventHandlers (socket, io) {
-    socket.on("joinChannel", ({deviceId, roomId, channelId}) => {
+    socket.on("joinChannel", async ({deviceId, roomId, channelId}) => {
         const room = getRoom(roomId);
         if (!room) {
             socket.emit("error", { message: "Room not found" });
@@ -25,22 +27,26 @@ export default function registerChannelEventHandlers (socket, io) {
                 if (previousChannel.activeSpeaker === deviceId) {
                     previousChannel.activeSpeaker = null;
                 }
+                await mediasoupManager.closePeerMedia(roomId, previousChannel.id, deviceId);
             }
             socket.leave(roomId + ":" + user.currentChannelId);
+            socket.leave(createChannelRoomKey(roomId, user.currentChannelId));
         }
 
         channel.addMember(deviceId);
         if (user) {
             user.currentChannelId = channelId;
         }
+        socket.data.currentChannelId = channelId;
         socket.join(roomId + ":" + channelId);
+        socket.join(createChannelRoomKey(roomId, channelId));
         socket.emit("channelJoined", { room, channel });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });
 
         console.log(deviceId, "joined channel", channelId, "in room", roomId);
     });
 
-    socket.on("leaveChannel", ({deviceId, roomId, channelId}) => {
+    socket.on("leaveChannel", async ({deviceId, roomId, channelId}) => {
         const room = getRoom(roomId);
         if (!room) {
             socket.emit("error", { message: "Room not found" });
@@ -64,6 +70,9 @@ export default function registerChannelEventHandlers (socket, io) {
             user.currentChannelId = null;
         }
         socket.leave(roomId + ":" + channelId);
+        socket.leave(createChannelRoomKey(roomId, channelId));
+        await mediasoupManager.closePeerMedia(roomId, channelId, deviceId);
+        socket.data.currentChannelId = null;
         socket.emit("channelLeft", { room, channel });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(roomId) });
 

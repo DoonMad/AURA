@@ -1,5 +1,7 @@
 import { getRoom, createRoom, removeRoom } from "../repositories/roomRepository.js";
 import { removeUser, getUsersInRoom, createUser, getUser } from "../repositories/userRepository.js";
+import { createChannelRoomKey } from "./mediasoupHandler.js";
+import mediasoupManager from "../mediasoup/mediasoupManager.js";
 
 function addUserToChannel(room, channelId, deviceId) {
     const channel = room.getChannel(channelId);
@@ -31,9 +33,13 @@ export default function registerRoomEventHandlers (socket, io) {
         room.addMember(deviceId);
         createUser(deviceId, displayName, room.id, socket.id);
         addUserToChannel(room, "channel-1", deviceId);
+        socket.data.deviceId = deviceId;
+        socket.data.roomId = room.id;
+        socket.data.currentChannelId = "channel-1";
 
         socket.join(room.id);
         socket.join(room.id + ":" + room.channels["channel-1"].id);
+        socket.join(createChannelRoomKey(room.id, "channel-1"));
         
         socket.emit("roomJoined", { room, users: getUsersInRoom(room.id) });
         io.to(room.id).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
@@ -52,9 +58,13 @@ export default function registerRoomEventHandlers (socket, io) {
         room.addMember(deviceId);
         createUser(deviceId, displayName, roomId, socket.id);
         addUserToChannel(room, "channel-1", deviceId);
+        socket.data.deviceId = deviceId;
+        socket.data.roomId = room.id;
+        socket.data.currentChannelId = "channel-1";
 
         socket.join(roomId);
         socket.join(roomId + ":" + room.channels["channel-1"].id);
+        socket.join(createChannelRoomKey(roomId, "channel-1"));
         
         socket.emit("roomJoined", { room, users: getUsersInRoom(room.id) });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
@@ -74,6 +84,11 @@ export default function registerRoomEventHandlers (socket, io) {
         const currentChannelId = channelId || user?.currentChannelId;
 
         removeUserFromRoom(room, deviceId);
+        if (currentChannelId) {
+            mediasoupManager.closePeerMedia(roomId, currentChannelId, deviceId).catch((error) => {
+                console.warn("Failed to close mediasoup media on leaveRoom", error);
+            });
+        }
         removeUser(deviceId);
         if(room.members.length === 0) {
             removeRoom(roomId);
@@ -82,7 +97,10 @@ export default function registerRoomEventHandlers (socket, io) {
         socket.leave(roomId);
         if (currentChannelId) {
             socket.leave(roomId + ":" + currentChannelId);
+            socket.leave(createChannelRoomKey(roomId, currentChannelId));
         }
+        socket.data.roomId = null;
+        socket.data.currentChannelId = null;
         socket.emit("roomLeft", { roomId });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
 

@@ -1,6 +1,9 @@
 /**
  * @format
  */
+import { registerGlobals } from 'react-native-webrtc';
+registerGlobals();
+
 
 import { AppRegistry } from 'react-native';
 import App from './App';
