@@ -21,38 +21,41 @@ const ChannelSelector: React.FC<ChannelSelectorProps> = ({
 }) => {
   return (
     <View className="items-center px-aura-md py-aura-xl mt-aura-lg z-20">
-      <Text className="text-aura-sm font-bold tracking-widest text-aura-muted uppercase mb-4">
-        Active Channel
+      <Text className="text-[10px] font-black tracking-[4px] text-aura-muted uppercase mb-4">
+        Channel
       </Text>
 
-      <View className="flex-row items-center justify-between w-full max-w-sm bg-surface-light border border-aura-border/50 rounded-full px-2 py-2 shadow-lg">
+      <View className="flex-row items-center justify-between w-full max-w-[280px] bg-surface-lighter border border-aura-border rounded-2xl px-2 py-3 shadow-lg">
         <TouchableOpacity 
           onPress={onPrev}
           activeOpacity={0.6}
-          className="w-12 h-12 rounded-full items-center justify-center bg-surface border border-aura-border"
+          className="w-12 h-12 rounded-xl items-center justify-center bg-surface border border-aura-border/50"
         >
-          <Icon name="chevron-left" size={24} color="#EEEDF2" />
+          <Icon name="chevron-left" size={20} color="#71717A" />
         </TouchableOpacity>
 
         <View className="items-center justify-center flex-1 px-4">
           <Text 
-            className={`text-2xl font-black text-center tracking-wider ${isActive ? 'text-primary' : 'text-white'}`}
+            className={`text-2xl font-black text-center tracking-wider ${isActive ? 'text-aura-active' : 'text-aura-text'}`}
             numberOfLines={1}
             adjustsFontSizeToFit
           >
             {channelName}
           </Text>
-          <Text className="text-xs text-aura-muted font-black tracking-widest mt-1">
-            {currentIndex + 1} / {totalChannels}
-          </Text>
+          <View className="flex-row items-center mt-1">
+            <View className={`w-1.5 h-1.5 rounded-full mr-2 ${isActive ? 'bg-aura-active shadow-glow-active' : 'bg-aura-muted'}`} />
+            <Text className="text-[10px] text-aura-muted font-bold tracking-widest">
+              CH 0{currentIndex + 1}
+            </Text>
+          </View>
         </View>
 
         <TouchableOpacity 
           onPress={onNext}
           activeOpacity={0.6}
-          className="w-12 h-12 rounded-full items-center justify-center bg-surface border border-aura-border"
+          className="w-12 h-12 rounded-xl items-center justify-center bg-surface border border-aura-border/50"
         >
-          <Icon name="chevron-right" size={24} color="#EEEDF2" />
+          <Icon name="chevron-right" size={20} color="#71717A" />
         </TouchableOpacity>
       </View>
     </View>

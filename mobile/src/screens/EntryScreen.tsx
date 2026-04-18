@@ -5,7 +5,6 @@
  * enters their display name and either creates or joins a room.
  *
  * Uses NativeWind (className) for styling.
- * Uses inline style only for letterSpacing (not supported by NativeWind).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -25,16 +24,13 @@ import type { EntryScreenProps, Room, User } from '../types';
 import useAppStore from '../store/useAppStore';
 
 const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
-  // ── Read identity from the global store ──
   const deviceId = useAppStore((s) => s.deviceId);
   const socket = useAppStore((s) => s.socket);
   const storedDisplayName = useAppStore((s) => s.displayName);
 
-  // Local state for the text input (so typing doesn't write to store on every keystroke)
   const [displayName, setDisplayName] = useState(storedDisplayName ?? '');
   const [roomId, setRoomId] = useState('');
 
-  // If the store already has a saved displayName, pre-fill the input
   useEffect(() => {
     if (storedDisplayName) {
       setDisplayName(storedDisplayName);
@@ -46,12 +42,8 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
 
     const handleRoomJoined = (data: { room: Room; users: User[] }) => {
       console.log('Room joined:', data.room);
-
-      // ── Write to the global store ──
       useAppStore.getState().setRoom(data.room);
       useAppStore.getState().setMembers(data.users);
-
-      // Navigate without passing any params — RoomScreen reads from the store
       navigation.navigate('Room');
     };
 
@@ -75,10 +67,8 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
     }
     if (!socket || !deviceId) return;
     if (roomId && roomId.length === 6) {
-      // Commit displayName to store + AsyncStorage
       useAppStore.getState().setDisplayName(displayName);
       await AsyncStorage.setItem('displayName', displayName);
-
       socket.emit('joinRoom', { deviceId, displayName, roomId });
     }
   };
@@ -89,11 +79,8 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
       return;
     }
     if (!socket || !deviceId) return;
-
-    // Commit displayName to store + AsyncStorage
     useAppStore.getState().setDisplayName(displayName);
     await AsyncStorage.setItem('displayName', displayName);
-
     socket.emit('createRoom', { deviceId, displayName });
   };
 
@@ -104,42 +91,38 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerClassName="flex-grow justify-center px-aura-xl py-aura-2xl"
+          contentContainerClassName="flex-grow justify-center px-8 py-12"
           keyboardShouldPersistTaps="handled"
         >
-          {/* ── Header ─────────────────────────────── */}
-          <View className="items-center mb-aura-2xl">
-            <Text
-              className="text-aura-2xl font-extrabold text-primary"
-              style={{ letterSpacing: 6 }}
-            >
+          {/* Header */}
+          <View className="items-center mb-12">
+            <Text className="text-5xl font-black text-primary tracking-[8px]">
               AURA
             </Text>
-            <Text
-              className="text-aura-sm text-aura-muted mt-aura-xs uppercase"
-              style={{ letterSpacing: 2 }}
-            >
-              Command Module
-            </Text>
+            <View className="mt-2 flex-row items-center opacity-80">
+              <View className="w-2 h-2 rounded-full bg-aura-active mr-2 shadow-glow-active" />
+              <Text className="text-sm text-aura-muted font-bold uppercase tracking-[4px]">
+                Command Module
+              </Text>
+            </View>
           </View>
 
-          {/* ── Form ───────────────────────────────── */}
-          <View className="w-full">
-            {/* Display Name */}
-            <View className="mb-aura-lg">
-              <Text className="text-aura-sm text-aura-muted mb-aura-sm font-medium">
-                Your Identity
+          {/* Form */}
+          <View className="w-full max-w-sm mx-auto p-6 bg-surface rounded-2xl border border-aura-border shadow-lg">
+            
+            <View className="mb-6">
+              <Text className="text-xs text-aura-muted mb-2 font-bold uppercase tracking-wider">
+                Operative ID
               </Text>
               <TextInputField
-                placeholder="Enter your name"
+                placeholder="Enter designation"
                 value={displayName}
-                onChangeText={(e) => {setDisplayName(e)}}
+                onChangeText={setDisplayName}
                 autoCapitalize="words"
               />
             </View>
 
-            {/* Create Room */}
-            <View className="mb-aura-lg">
+            <View className="mb-4">
               <PrimaryButton
                 title="Create Room"
                 onPress={handleCreateRoom}
@@ -147,36 +130,34 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
               />
             </View>
 
-            {/* Divider */}
-            <SectionDivider label="or" />
+            <SectionDivider label="OR CONNECT" />
 
-            {/* Join Room */}
-            <View className="mb-aura-lg">
-              <Text className="text-aura-sm text-aura-muted mb-aura-sm font-medium">
-                Join Existing Room
+            <View className="mb-2">
+              <Text className="text-xs text-aura-muted mb-2 font-bold uppercase tracking-wider">
+                Target Frequency
               </Text>
               <TextInputField
-                placeholder="Enter Room Code"
+                placeholder="6-Digit Code"
                 value={roomId}
-                onChangeText={(e) => {setRoomId(e)}}
+                onChangeText={setRoomId}
                 autoCapitalize="characters"
               />
-              <View className="h-aura-md" />
+              <View className="h-4" />
               <PrimaryButton
                 title="Join Room"
                 onPress={handleJoinRoom}
                 variant="outline"
               />
             </View>
+          </View>
 
-            {/* Hardware Debug Button */}
-            <View className="mt-8">
-              <PrimaryButton
-                title="Debug Hardware Mic"
-                onPress={() => navigation.navigate('MicTester')}
-                variant="outline"
-              />
-            </View>
+          {/* Hardware Debug Button */}
+          <View className="mt-12 w-full max-w-sm mx-auto">
+            <PrimaryButton
+              title="Mic Tester"
+              onPress={() => navigation.navigate('MicTester')}
+              variant="outline"
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

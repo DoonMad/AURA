@@ -4,9 +4,9 @@ import type { ConnectionState, RoomHeaderProps } from '../types'
 import Icon from 'react-native-vector-icons/Feather'
 
 const statusDot: Record<ConnectionState, string> = {
-  connected: 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]',
-  reconnecting: 'bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)]',
-  disconnected: 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]',
+  connected: 'bg-aura-active shadow-glow-active',
+  reconnecting: 'bg-aura-standby shadow-glow-standby',
+  disconnected: 'bg-aura-danger',
 }
 
 export interface ExtendedRoomHeaderProps extends RoomHeaderProps {
@@ -14,20 +14,18 @@ export interface ExtendedRoomHeaderProps extends RoomHeaderProps {
 }
 
 const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionState, onSharePress }) => {
-  const roomSlug = typeof roomName === 'string'
-    ? roomName.toLowerCase().replace(/\s+/g, '')
-    : 'loading';
+  const roomLabel = typeof roomName === 'string' ? roomName : 'loading';
 
   return (
-    <View className="flex-row items-center justify-between px-aura-xl py-aura-lg bg-surface/90 border-b border-aura-border z-30 w-full pt-12 shadow-lg backdrop-blur-md">
+    <View className="flex-row items-center justify-between px-6 py-4 bg-surface/95 border-b border-aura-border z-30 w-full pt-5 shadow-lg">
       {/* Title & Connection Dot */}
       <View className="flex-row items-center">
         <View>
-          <Text className="text-aura-xl font-extrabold text-white tracking-[4px] uppercase">{roomName}</Text>
+          <Text className="text-2xl font-black text-primary tracking-[4px] uppercase">{roomName}</Text>
           <View className="flex-row items-center mt-1">
-            <View className={`w-2 h-2 rounded-full mr-2 ${statusDot[connectionState]}`} />
-            <Text className="text-[10px] text-aura-muted uppercase tracking-widest font-bold">
-              #{roomSlug}
+            <View className={`w-1.5 h-1.5 rounded-full mr-2 ${statusDot[connectionState]}`} />
+            <Text className="text-[10px] text-aura-muted uppercase tracking-[3px] font-bold">
+              Room ID: {roomLabel}
             </Text>
           </View>
         </View>
@@ -39,9 +37,9 @@ const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionSta
           <TouchableOpacity 
             onPress={onSharePress}
             activeOpacity={0.6}
-            className="w-10 h-10 rounded-full bg-surface-light border border-aura-border items-center justify-center"
+            className="w-10 h-10 rounded-full bg-surface-lighter border border-aura-border items-center justify-center"
           >
-            <Icon name="share-2" size={18} color="#A78BFA" />
+            <Icon name="share-2" size={16} color="#FAFAFA" />
           </TouchableOpacity>
         )}
       </View>

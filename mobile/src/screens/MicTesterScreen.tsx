@@ -54,7 +54,7 @@ export default function MicTesterScreen({ navigation }: any) {
         return;
       }
       audioTrack.enabled = true;
-      addLog(`OK: Track id=${audioTrack.id} enabled=${audioTrack.enabled} readyState=${audioTrack.readyState}`);
+      addLog(`OK: Track id=${audioTrack.id} enabled=${audioTrack.enabled}`);
 
       // ── Step 3: Socket — create a test room ──
       addLog('Step 3: Creating test room via socket...');
@@ -163,7 +163,7 @@ export default function MicTesterScreen({ navigation }: any) {
       const interval = setInterval(() => {
         if (producer.closed) return clearInterval(interval);
         producer.getStats().then(stats => {
-          stats.forEach(stat => {
+          stats.forEach((stat: any) => {
             if (stat.type === 'outbound-rtp') {
               setBytesSent(stat.bytesSent);
               addLog(`  [RTP] bytesSent=${stat.bytesSent} packetsSent=${stat.packetsSent}`);
@@ -177,7 +177,7 @@ export default function MicTesterScreen({ navigation }: any) {
         clearInterval(interval);
         producer.close();
         transport.close();
-        stream.release();
+        stream.getTracks().forEach((track) => track.stop());
         // Leave the test room
         socket.emit('leaveRoom', { deviceId: deviceId || 'mic-tester', roomId });
         addLog('=== TEST COMPLETE ===');

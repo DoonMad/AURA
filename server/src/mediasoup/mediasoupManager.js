@@ -16,10 +16,7 @@ const AUDIO_MEDIA_CODECS = [
 import os from "os";
 
 function getLocalIp() {
-  // Fly.io provides the public IP automatically
-  if (process.env.FLY_PUBLIC_IP) {
-    return process.env.FLY_PUBLIC_IP;
-  }
+  // Removed Fly.io specific public IP handling; fallback to local network interfaces
 
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {

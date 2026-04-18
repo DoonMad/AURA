@@ -4,6 +4,7 @@ import { PermissionsAndroid, Platform, Text, View } from 'react-native'
 import { RTCView } from 'react-native-webrtc'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import InCallManager from 'react-native-incall-manager'
+import { Share } from 'react-native'
 import RoomHeader from '../components/RoomHeader'
 import SpeakerArea from '../components/SpeakerArea'
 import PushToTalkButton from '../components/PushToTalkButton'
@@ -14,7 +15,6 @@ import useAppStore, { useMemberById, useMembersArray } from '../store/useAppStor
 import { BACKEND_HOST } from '../config/network'
 
 const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
-  // ── Read from the global store (no more route.params!) ──
   const room = useAppStore((s) => s.room)
   const socket = useAppStore((s) => s.socket)
   const deviceId = useAppStore((s) => s.deviceId)
@@ -26,17 +26,13 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const [mediaSessionReady, setMediaSessionReady] = useState(false)
   const [mediasoupReady, setMediasoupReady] = useState(false)
   const [tracksVersion, setTracksVersion] = useState(0)
- 
 
-  // ── Local UI state ──
   const channels = useMemo(() => (room ? Object.values(room.channels) : []), [room])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
-
   const [volume, setVolume] = useState(0.5)
   const connectionState: 'connected' | 'reconnecting' | 'disconnected' = 'connected'
   const [micPermissionGranted, setMicPermissionGranted] = useState(Platform.OS !== 'android')
 
-  // Listen for real-time room updates from the backend
   useEffect(() => {
     if (!socket) return;
 
@@ -91,18 +87,32 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     };
   }, [socket, navigation]);
 
-  // Route audio to main speaker, not earpiece
   useEffect(() => {
-    // 'video' mode defaults to loudspeaker; 'audio' defaults to earpiece
-    InCallManager.start({ media: 'video' });
-    InCallManager.setForceSpeakerphoneOn(true);
+    if (!InCallManager) {
+        console.warn('InCallManager is not available (checking if on emulator?)');
+        return;
+    }
+    try {
+        InCallManager.start({ media: 'audio' });
+        InCallManager.setForceSpeakerphoneOn(true);
+        InCallManager.setSpeakerphoneOn(true);
+        InCallManager.requestAudioFocus?.().catch?.(() => {});
+        void InCallManager.chooseAudioRoute('SPEAKER_PHONE').catch((error: unknown) => {
+          console.warn('Failed to choose speaker audio route:', error);
+        });
+    } catch (e) {
+        console.warn('InCallManager start failed:', e);
+    }
+    
     return () => {
-      InCallManager.setForceSpeakerphoneOn(false);
-      InCallManager.stop();
+      try {
+        InCallManager.setForceSpeakerphoneOn(false);
+        InCallManager.setSpeakerphoneOn(false);
+        InCallManager.stop();
+      } catch (e) {}
     };
   }, []);
 
-  // Default channel if none selected
   useEffect(() => {
     if (channels.length === 0) return;
 
@@ -171,7 +181,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     const requestWebRTCPermissions = async () => {
       try {
         const permissionsToRequest = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-        if (Platform.Version >= 31) {
+        if (Number(Platform.Version) >= 31) {
            permissionsToRequest.push(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
         }
         
@@ -192,7 +202,6 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     };
   }, []);
 
-  // ── Derived state ──
   const selectedChannel = channels?.find((c) => c.id === selectedChannelId)
   const currentIndex = channels.findIndex(ch => ch.id === selectedChannelId)
 
@@ -209,23 +218,32 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     talkState = 'speaking_other';
   }
 
-  // ── Handlers ──
   const onMembersPress = () => {
-    // No params needed — MembersScreen reads from the store
     navigation.navigate('Members')
   }
 
   const onLeavePress = () => {
     if (!socket || !room || !deviceId || !selectedChannelId) return
     socket.emit('leaveRoom', { deviceId, roomId: room.id, channelId: selectedChannelId })
+    mediasoupSession.current?.releaseMicProducer()
     mediasoupSession.current?.dispose()
     useAppStore.getState().clearSession()
     navigation.navigate('Entry')
   }
 
-  const onSharePress = () => {
-    if (room) console.log('Share room:', room.id)
-    // TODO: open share sheet with room link or code
+  const onSharePress = async () => {
+    if (!room) return;
+    try {
+      const url = `${BACKEND_HOST}/room/${room.id}`;
+      const result = await Share.share({
+        message: `Join my AURA room: ${url}`,
+        title: 'AURA Room Invite',
+        url,
+      });
+      console.log('Share result', result);
+    } catch (error) {
+      console.warn('Share failed', error);
+    }
   }
 
   const onTalkPressIn = async () => {
@@ -263,20 +281,24 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     pttHeldRef.current = false;
     console.log('[ptt] pressOut releaseMic', room.id, selectedChannelId, deviceId);
     socket.emit('releaseMic', { deviceId, roomId: room.id, channelId: selectedChannelId });
+    mediasoupSession.current?.releaseMicProducer();
   }
 
   const onPrevChannel = () => {
-    if (channels.length === 0 || !socket || !deviceId || !room) return
-    const idx = channels.findIndex(ch => ch.id === selectedChannelId)
-    const prevIdx = idx <= 0 ? channels.length - 1 : idx - 1
-    socket.emit("leaveChannel", { deviceId, roomId: room.id, channelId: selectedChannelId })
-    setSelectedChannelId(channels[prevIdx].id)
+    if (channels.length === 0 || !socket || !deviceId || !room) return;
+    const idx = channels.findIndex(ch => ch.id === selectedChannelId);
+    const prevIdx = idx <= 0 ? channels.length - 1 : idx - 1;
+    const prevChannelId = channels[prevIdx].id;
+    socket.emit('leaveChannel', { deviceId, roomId: room.id, channelId: selectedChannelId });
+    socket.emit('joinChannel', { deviceId, roomId: room.id, channelId: prevChannelId });
+    setSelectedChannelId(prevChannelId);
   }
-
+  
   const onNextChannel = () => {
     if (channels.length === 0 || !socket || !deviceId || !room) return
     const idx = channels.findIndex(ch => ch.id === selectedChannelId)
     const nextIdx = idx === -1 || idx === channels.length - 1 ? 0 : idx + 1
+    socket.emit('leaveChannel', { deviceId, roomId: room.id, channelId: selectedChannelId });
     socket.emit("joinChannel", { deviceId, roomId: room.id, channelId: channels[nextIdx].id })
     setSelectedChannelId(channels[nextIdx].id)
   }
@@ -285,19 +307,12 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
 
       <View className="flex-1 relative">
-        {/* Header - Stays glued to top */}
         <RoomHeader 
           roomName={room?.id ?? 'Loading...'} 
           connectionState={connectionState} 
           onSharePress={onSharePress} 
         />
-        <View className="absolute top-20 right-4 z-20 rounded-full bg-black/40 px-3 py-2">
-          <Text className="text-[10px] font-bold uppercase tracking-[2px] text-white">
-            {BACKEND_HOST}
-          </Text>
-        </View>
         
-        {/* Hidden RTCViews to keep the WebRTC C++ Media Engine from suspending audio tracks */}
         {mediasoupSession.current?.getLocalStream() && (
           <RTCView 
             streamURL={mediasoupSession.current.getLocalStream().toURL()} 
@@ -312,11 +327,15 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
           />
         ))}
 
-        {/* Main Content Area - Distributes elements cleanly using flex space-between */}
-        <View className="flex-1 flex-col justify-around items-center pt-8 pb-48">
-          
-          {/* Top Half Spacer: Pushes the channel selector slightly down */}
-          <View style={{ flex: 0.5 }} />
+        <View className="flex-1 flex-col items-center pt-6 pb-48">
+          <View style={{ flex: 0.2 }} />
+
+          <SpeakerArea 
+            speakerName={activeSpeaker?.name ?? null} 
+            isActive={talkState === 'speaking_other' || talkState === 'speaking_self'} 
+          />
+
+          <View style={{ flex: 0.4 }} />
 
           <ChannelSelector 
             channelName={selectedChannel?.name ?? 'Connecting...'}
@@ -327,15 +346,6 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
             isActive={talkState !== 'idle'}
           />
 
-          {/* Middle Spacer */}
-          <View style={{ flex: 1.5 }} />
-
-          <SpeakerArea 
-            speakerName={activeSpeaker?.name ?? null} 
-            isActive={talkState === 'speaking_other' || talkState === 'speaking_self'} 
-          />
-
-          {/* Bottom spacer to pad against the PTT button absolute area */}
           <View style={{ flex: 1 }} />
         </View>
 

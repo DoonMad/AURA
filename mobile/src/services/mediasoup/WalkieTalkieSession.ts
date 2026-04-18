@@ -1,6 +1,6 @@
 import { Device } from 'mediasoup-client';
 import type { types as MediasoupTypes } from 'mediasoup-client';
-import { mediaDevices, MediaStream, RTCPeerConnection } from 'react-native-webrtc';
+import { mediaDevices, MediaStream } from 'react-native-webrtc';
 import type { Socket } from 'socket.io-client';
 import { setupWebRTC } from '../webrtc/setupWebRTC';
 
@@ -76,7 +76,7 @@ export default class WalkieTalkieSession {
   private micProducer: Producer | null = null;
   private micProducerPromise: Promise<Producer> | null = null;
   private localStream: MediaStream | null = null;
-  private dummyPC: any = null; // Ignition hack for Native Android Microphones
+  private micReleaseRequested = false;
   private initialized = false;
   private pendingConsumers = new Set<string>();
   private remoteConsumers = new Map<string, Consumer>();
@@ -124,13 +124,8 @@ export default class WalkieTalkieSession {
     }
 
     if (this.micProducer && !this.micProducer.closed) {
-      if (this.micProducer.paused) {
-        console.log('[mediasoup] mic producer already paused');
-        return;
-      }
-
-      void this.micProducer.pause();
-      console.log('[mediasoup] mic producer paused');
+      console.log('[mediasoup] mic state changed away from self, releasing local capture');
+      void this.releaseMicProducer();
     }
   };
 
@@ -226,13 +221,9 @@ export default class WalkieTalkieSession {
       this.localStream = null;
     }
 
-    if (this.dummyPC) {
-      this.dummyPC.close();
-      this.dummyPC = null;
-    }
-
     this.device = null;
     this.initialized = false;
+    this.micReleaseRequested = false;
   }
 
   getRemoteStreams() {
@@ -241,6 +232,39 @@ export default class WalkieTalkieSession {
 
   getLocalStream() {
     return this.localStream;
+  }
+
+  async releaseMicProducer() {
+    this.micReleaseRequested = true;
+
+    if (this.micProducerPromise) {
+      console.log('[mediasoup] mic release requested while producer creation is in flight');
+      return;
+    }
+
+    const producer = this.micProducer;
+
+    if (producer && !producer.closed) {
+      console.log('[mediasoup] detaching mic track for release', producer.id);
+      try {
+        producer.pause();
+        await producer.replaceTrack({ track: null });
+      } catch (error) {
+        console.warn('[mediasoup] failed to detach mic track', error);
+      }
+    }
+
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (error) {
+          console.warn('[mediasoup] failed to stop local track', error);
+        }
+      });
+      this.localStream = null;
+      this.onTracksUpdated?.();
+    }
   }
 
   private onTracksUpdated: (() => void) | null = null;
@@ -382,11 +406,6 @@ export default class WalkieTalkieSession {
   }
 
   async ensureMicProducer() {
-    if (this.micProducer && !this.micProducer.closed) {
-      console.log('[mediasoup] reusing existing mic producer', this.micProducer.id);
-      return this.micProducer;
-    }
-
     if (this.micProducerPromise) {
       console.log('[mediasoup] mic producer creation already in progress');
       return this.micProducerPromise;
@@ -394,6 +413,66 @@ export default class WalkieTalkieSession {
 
     if (!this.sendTransport) {
       throw new Error('Send transport is not ready');
+    }
+
+    this.micReleaseRequested = false;
+
+    if (this.micProducer && !this.micProducer.closed) {
+      if (this.localStream) {
+        console.log('[mediasoup] reusing existing mic producer', this.micProducer.id);
+        return this.micProducer;
+      }
+
+      const existingProducer = this.micProducer;
+      console.log('[mediasoup] reattaching mic track to existing producer', this.micProducer.id);
+      this.micProducerPromise = (async () => {
+        console.log('[mediasoup] requesting microphone access');
+        let stream: MediaStream;
+        try {
+          stream = await mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false
+          });
+        } catch (err) {
+          console.error('[mediasoup] getUserMedia failed', err);
+          throw err;
+        }
+
+        console.log('[mediasoup] getUserMedia ok', {
+          audioTracks: stream.getAudioTracks().length,
+          videoTracks: stream.getVideoTracks().length
+        });
+
+        this.localStream = stream;
+        this.onTracksUpdated?.();
+
+        const audioTrack = stream.getAudioTracks()[0];
+        if (!audioTrack) {
+          throw new Error('Microphone track is not available');
+        }
+
+        audioTrack.enabled = true;
+        console.log('[mediasoup] audio track ready', audioTrack.id);
+        console.log('[mediasoup] replacing existing producer track');
+        await existingProducer.replaceTrack({ track: audioTrack });
+        console.log('[mediasoup] existing mic producer reattached', existingProducer.id);
+        return existingProducer;
+      })();
+
+      try {
+        const producer = await this.micProducerPromise;
+        console.log('[mediasoup] mic producer ready', producer.id);
+        return producer;
+      } catch (e) {
+        console.error('[mediasoup] Error inside micProducerPromise', e);
+        throw e;
+      } finally {
+        this.micProducerPromise = null;
+      }
     }
 
     console.log('[mediasoup] creating mic producer');
@@ -429,40 +508,6 @@ export default class WalkieTalkieSession {
 
       audioTrack.enabled = true;
 
-      // ── Android SDP Ignition ──────────────────────────────────────
-      // Android's native WebRTC layer only powers on the physical
-      // microphone after an RTCPeerConnection completes a FULL
-      // offer/answer cycle (both local AND remote descriptions set).
-      // mediasoup-client uses synthetic SDP and never does this,
-      // so the mic hardware stays off.  We spin up a throwaway
-      // loopback PC, run a real negotiation, and discard it.
-      // The track is now globally "hot" for any subsequent PC.
-      // ─────────────────────────────────────────────────────────────
-      if (!this.dummyPC) {
-        console.log('[mediasoup] starting SDP ignition for Android mic wake');
-        const pc1 = new RTCPeerConnection({});
-        const pc2 = new RTCPeerConnection({});
-
-        // Attach the mic track to pc1
-        stream.getTracks().forEach((t: any) => pc1.addTrack(t, stream));
-
-        // Exchange ICE candidates
-        pc1.onicecandidate = (e: any) => { if (e.candidate) pc2.addIceCandidate(e.candidate); };
-        pc2.onicecandidate = (e: any) => { if (e.candidate) pc1.addIceCandidate(e.candidate); };
-
-        // Full offer/answer — this is what wakes the hardware
-        const offer = await pc1.createOffer();
-        await pc1.setLocalDescription(offer);
-        await pc2.setRemoteDescription(offer);
-        const answer = await pc2.createAnswer();
-        await pc2.setLocalDescription(answer);
-        await pc1.setRemoteDescription(answer);
-
-        // Keep pc1 alive (closing it would kill the track globally)
-        this.dummyPC = pc1;
-        pc2.close();
-        console.log('[mediasoup] SDP ignition complete — mic hardware is active');
-      }
 
       console.log('[mediasoup] audio track ready', audioTrack.id);
 
@@ -477,6 +522,21 @@ export default class WalkieTalkieSession {
       console.log('[mediasoup] producer created', producer.id);
 
       this.micProducer = producer;
+
+      producer.on('@close', () => {
+        console.log('[mediasoup] mic producer closed');
+        if (this.localStream) {
+          this.localStream.getTracks().forEach((track) => {
+            try {
+              track.stop();
+            } catch (error) {
+              console.warn('[mediasoup] failed to stop track after producer close', error);
+            }
+          });
+          this.localStream = null;
+          this.onTracksUpdated?.();
+        }
+      });
 
       // --- SENDER DIAGNOSTICS LOG ---
       const outInterval = setInterval(() => {
@@ -494,6 +554,16 @@ export default class WalkieTalkieSession {
       }, 2000);
       producer.on('transportclose', () => clearInterval(outInterval));
       // ------------------------------
+
+      if (this.micReleaseRequested) {
+        console.log('[mediasoup] mic release requested during producer creation; cleaning up');
+        try {
+          producer.close();
+        } catch (error) {
+          console.warn('[mediasoup] failed to close producer during release cleanup', error);
+        }
+        throw new Error('Mic release requested before producer was ready');
+      }
 
       return producer;
     })();
