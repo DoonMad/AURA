@@ -245,12 +245,11 @@ export default class WalkieTalkieSession {
     const producer = this.micProducer;
 
     if (producer && !producer.closed) {
-      console.log('[mediasoup] detaching mic track for release', producer.id);
+      console.log('[mediasoup] closing mic producer for release', producer.id);
       try {
-        producer.pause();
-        await producer.replaceTrack({ track: null });
+        producer.close();
       } catch (error) {
-        console.warn('[mediasoup] failed to detach mic track', error);
+        console.warn('[mediasoup] failed to close mic producer', error);
       }
     }
 
@@ -265,6 +264,8 @@ export default class WalkieTalkieSession {
       this.localStream = null;
       this.onTracksUpdated?.();
     }
+
+    this.micProducer = null;
   }
 
   private onTracksUpdated: (() => void) | null = null;
@@ -459,6 +460,7 @@ export default class WalkieTalkieSession {
         console.log('[mediasoup] audio track ready', audioTrack.id);
         console.log('[mediasoup] replacing existing producer track');
         await existingProducer.replaceTrack({ track: audioTrack });
+        audioTrack.enabled = true;
         console.log('[mediasoup] existing mic producer reattached', existingProducer.id);
         return existingProducer;
       })();
@@ -475,8 +477,8 @@ export default class WalkieTalkieSession {
       }
     }
 
-    console.log('[mediasoup] creating mic producer');
-    this.micProducerPromise = (async () => {
+      console.log('[mediasoup] creating mic producer');
+      this.micProducerPromise = (async () => {
       console.log('[mediasoup] requesting microphone access');
       let stream: MediaStream;
       try {
