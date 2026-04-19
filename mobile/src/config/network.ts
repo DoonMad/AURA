@@ -1,5 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 
+const DEFAULT_BACKEND_HOST = '80.225.238.88';
+
 function getHostFromScriptUrl() {
   const scriptUrl = NativeModules.SourceCode?.scriptURL as string | undefined;
   const match = scriptUrl?.match(/^https?:\/\/([^/:]+)(?::\d+)?\//);
@@ -13,28 +15,26 @@ function getBackendHost() {
   }
 
   if (Platform.OS !== 'android') {
-    return 'localhost';
+    return DEFAULT_BACKEND_HOST;
   }
 
   const host = getHostFromScriptUrl();
-  
-  // If we're on a physical device (hotspot), 10.0.2.2 won't work.
-  // We prefer the laptop's hotspot IP (192.168.137.1) specifically for physical phones.
-  if (host === '10.0.2.2' || host === 'localhost' || host === '127.0.0.1') {
-    // Check if we are likely on an emulator (10.0.2.2 is usually the bundler host for emulators)
-    if (host === '10.0.2.2') {
-        return '10.0.2.2';
-    }
-    // If it's localhost, let's assume adb reverse is being used or fallback to hotspot IP
-    return '192.168.137.1';
-  }
-
-  if (host) {
+  if (host && host !== 'localhost' && host !== '127.0.0.1' && host !== '10.0.2.2') {
     return host;
   }
 
-  return '192.168.137.1';
+  return DEFAULT_BACKEND_HOST;
+}
+
+function getBackendUrl() {
+  const overrideUrl = (globalThis as typeof globalThis & { __AURA_BACKEND_URL__?: string }).__AURA_BACKEND_URL__;
+  if (overrideUrl) {
+    return overrideUrl;
+  }
+
+  const host = getBackendHost();
+  return `http://${host}:3000`;
 }
 
 export const BACKEND_HOST = getBackendHost();
-export const BACKEND_URL = `http://${BACKEND_HOST}:3000`;
+export const BACKEND_URL = getBackendUrl();
