@@ -107,7 +107,8 @@ export default function registerMediasoupEventHandlers(socket, io) {
                 transportId,
                 kind,
                 rtpParameters,
-                appData
+                appData,
+                paused: Boolean(appData?.startPaused)
             });
 
             console.log("[mediasoup] produce ok", { transportId, producerId: result.id });

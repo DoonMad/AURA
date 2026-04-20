@@ -265,7 +265,7 @@ class MediasoupManager {
     return true;
   }
 
-  async produce({ transportId, kind, rtpParameters, appData = {} }) {
+  async produce({ transportId, kind, rtpParameters, appData = {}, paused = false }) {
     const entry = this.transports.get(transportId);
     if (!entry) {
       throw new Error(`Transport not found: ${transportId}`);
@@ -274,15 +274,15 @@ class MediasoupManager {
     const { peer } = this._getPeerState(entry.roomId, entry.channelId, entry.peerId);
     for (const existingProducer of peer.producers.values()) {
       if (existingProducer.kind === kind && !existingProducer.closed) {
-        return {
-          id: existingProducer.id
-        };
+        existingProducer.close();
+        this._deleteProducer(existingProducer.id);
       }
     }
 
     const producer = await entry.transport.produce({
       kind,
       rtpParameters,
+      paused,
       appData: {
         ...appData,
         roomId: entry.roomId,
@@ -483,6 +483,24 @@ class MediasoupManager {
     return true;
   }
 
+  async closePeerAudioProducer(roomId, channelId, peerId) {
+    const channel = this._getChannelState(roomId, channelId);
+    const peer = channel.peers.get(peerId);
+
+    if (!peer) {
+      return false;
+    }
+
+    const producer = this._getPeerAudioProducer(roomId, channelId, peerId);
+    if (!producer || producer.closed) {
+      return false;
+    }
+
+    producer.close();
+    this._deleteProducer(producer.id);
+    return true;
+  }
+
   async closePeerMedia(roomId, channelId, peerId) {
     const channel = this._getChannelState(roomId, channelId);
     const peer = channel.peers.get(peerId);
@@ -547,7 +565,7 @@ class MediasoupManager {
     }
 
     for (const producer of peer.producers.values()) {
-      if (producer.kind === "audio") {
+      if (producer.kind === "audio" && !producer.closed) {
         return producer;
       }
     }

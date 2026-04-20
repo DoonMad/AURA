@@ -113,6 +113,20 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     };
   }, []);
 
+  // Re-assert speakerphone whenever WebRTC tracks change, because
+  // getUserMedia / new consumers can reset the audio route to earpiece.
+  useEffect(() => {
+    if (tracksVersion > 0 && InCallManager) {
+      try {
+        console.log('[audio] re-asserting speakerphone after track change v' + tracksVersion);
+        InCallManager.setForceSpeakerphoneOn(true);
+        InCallManager.setSpeakerphoneOn(true);
+      } catch (e) {
+        console.warn('[audio] failed to re-assert speakerphone', e);
+      }
+    }
+  }, [tracksVersion]);
+
   useEffect(() => {
     if (channels.length === 0) return;
 

@@ -425,8 +425,8 @@ export default class WalkieTalkieSession {
       }
 
       const existingProducer = this.micProducer;
-      console.log('[mediasoup] reattaching mic track to existing producer', this.micProducer.id);
-      this.micProducerPromise = (async () => {
+        console.log('[mediasoup] reattaching mic track to existing producer', this.micProducer.id);
+        this.micProducerPromise = (async () => {
         console.log('[mediasoup] requesting microphone access');
         let stream: MediaStream;
         try {
@@ -514,11 +514,13 @@ export default class WalkieTalkieSession {
       console.log('[mediasoup] audio track ready', audioTrack.id);
 
       console.log('[mediasoup] calling transport.produce');
-      const producer = await this.sendTransport!.produce({
+      const producer = await (this.sendTransport! as any).produce({
         track: audioTrack,
+        paused: true,
         stopTracks: false,
         appData: {
-          source: 'microphone'
+          source: 'microphone',
+          startPaused: true
         }
       });
       console.log('[mediasoup] producer created', producer.id);
@@ -546,7 +548,7 @@ export default class WalkieTalkieSession {
           clearInterval(outInterval);
           return;
         }
-        producer.getStats().then(stats => {
+        producer.getStats().then((stats: any) => {
           stats.forEach((stat: any) => {
             if (stat.type === 'outbound-rtp') {
               console.log(`[RTP OUTBOUND] Audio Bytes Sent: ${stat.bytesSent}`);

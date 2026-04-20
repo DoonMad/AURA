@@ -77,8 +77,8 @@ export default function registerAudioEventHandlers (socket, io) {
             channel.activeSpeaker = null;
             if (user) user.isSpeaking = false;
 
-            const paused = await mediasoupManager.pausePeerProducer(roomId, channelId, deviceId);
-            console.log("[audio] mic released", { deviceId, roomId, channelId, paused });
+            const closed = await mediasoupManager.closePeerAudioProducer(roomId, channelId, deviceId);
+            console.log("[audio] mic released", { deviceId, roomId, channelId, closed });
             socket.emit("micReleased", { roomId, channelId });
             io.to(roomId).emit("micStateUpdated", {
                 roomId,
