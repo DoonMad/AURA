@@ -13,6 +13,14 @@ import { create } from 'zustand';
 import type { Socket } from 'socket.io-client';
 import type { Room, User } from '../types/models';
 
+export type AppNoticeTone = 'info' | 'success' | 'warning' | 'error';
+
+export type AppNotice = {
+  tone: AppNoticeTone;
+  title: string;
+  message: string;
+};
+
 /* ────────────────────────────────────────────
  * Store shape
  * ──────────────────────────────────────────── */
@@ -26,6 +34,7 @@ interface AppState {
   socket: Socket | null;
   room: Room | null;
   members: Map<string, User>;          // keyed by user.id for O(1) lookups
+  notice: AppNotice | null;
 
   // ── Actions ──
   setIdentity: (deviceId: string, displayName: string | null) => void;
@@ -35,6 +44,7 @@ interface AppState {
   setMembers: (users: User[]) => void;  // accepts an array, stores as Map
   updateMember: (user: User) => void;   // update a single member in-place
   clearSession: () => void;             // called on leave room / disconnect
+  setNotice: (notice: AppNotice | null) => void;
 }
 
 /* ────────────────────────────────────────────
@@ -48,6 +58,7 @@ const useAppStore = create<AppState>((set) => ({
   socket: null,
   room: null,
   members: new Map(),
+  notice: null,
 
   // ── Actions ──
   setIdentity: (deviceId, displayName) =>
@@ -73,7 +84,10 @@ const useAppStore = create<AppState>((set) => ({
     }),
 
   clearSession: () =>
-    set({ room: null, members: new Map() }),
+    set({ room: null, members: new Map(), notice: null }),
+
+  setNotice: (notice) =>
+    set({ notice }),
 }));
 
 /* ────────────────────────────────────────────

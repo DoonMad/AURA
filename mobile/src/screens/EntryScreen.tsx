@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TextInputField from '../components/TextInputField';
 import PrimaryButton from '../components/PrimaryButton';
 import SectionDivider from '../components/SectionDivider';
+import SystemBanner from '../components/SystemBanner';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { EntryScreenProps, Room, User } from '../types';
 import useAppStore from '../store/useAppStore';
@@ -27,6 +28,8 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
   const deviceId = useAppStore((s) => s.deviceId);
   const socket = useAppStore((s) => s.socket);
   const storedDisplayName = useAppStore((s) => s.displayName);
+  const notice = useAppStore((s) => s.notice);
+  const setNotice = useAppStore((s) => s.setNotice);
 
   const [displayName, setDisplayName] = useState(storedDisplayName ?? '');
   const [roomId, setRoomId] = useState('');
@@ -42,13 +45,19 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
 
     const handleRoomJoined = (data: { room: Room; users: User[] }) => {
       console.log('Room joined:', data.room);
+      setNotice(null);
       useAppStore.getState().setRoom(data.room);
       useAppStore.getState().setMembers(data.users);
       navigation.navigate('Room');
     };
 
     const handleError = (error: any) => {
-      console.warn('Socket error:', error);
+      const message = typeof error?.message === 'string' ? error.message : 'Unable to join the room.';
+      setNotice({
+        tone: 'error',
+        title: 'Room Error',
+        message,
+      });
     };
 
     socket.on('roomJoined', handleRoomJoined);
@@ -62,23 +71,48 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
 
   const handleJoinRoom = async () => {
     if (!displayName) {
-      console.warn('Please enter a display name');
+      setNotice({
+        tone: 'warning',
+        title: 'Missing Name',
+        message: 'Please enter a display name before joining a room.',
+      });
       return;
     }
     if (!socket || !deviceId) return;
-    if (roomId && roomId.length === 6) {
-      useAppStore.getState().setDisplayName(displayName);
-      await AsyncStorage.setItem('displayName', displayName);
-      socket.emit('joinRoom', { deviceId, displayName, roomId });
+    const trimmedRoomId = roomId.trim().toUpperCase();
+    if (trimmedRoomId.length !== 6) {
+      setNotice({
+        tone: 'warning',
+        title: 'Invalid Room',
+        message: 'Enter the 6-character room code to join.',
+      });
+      return;
     }
+    setNotice({
+      tone: 'info',
+      title: 'Joining Room',
+      message: `Attempting to join ${trimmedRoomId}.`,
+    });
+    useAppStore.getState().setDisplayName(displayName);
+    await AsyncStorage.setItem('displayName', displayName);
+    socket.emit('joinRoom', { deviceId, displayName, roomId: trimmedRoomId });
   };
 
   const handleCreateRoom = async () => {
     if (!displayName) {
-      console.warn('Please enter a display name');
+      setNotice({
+        tone: 'warning',
+        title: 'Missing Name',
+        message: 'Please enter a display name before creating a room.',
+      });
       return;
     }
     if (!socket || !deviceId) return;
+    setNotice({
+      tone: 'info',
+      title: 'Creating Room',
+      message: 'Generating a new command room now.',
+    });
     useAppStore.getState().setDisplayName(displayName);
     await AsyncStorage.setItem('displayName', displayName);
     socket.emit('createRoom', { deviceId, displayName });
@@ -106,6 +140,13 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           </View>
+
+          {notice && (
+            <SystemBanner
+              notice={notice}
+              onDismiss={() => setNotice(null)}
+            />
+          )}
 
           {/* Form */}
           <View className="w-full max-w-sm mx-auto p-6 bg-surface rounded-2xl border border-aura-border shadow-lg">
@@ -139,7 +180,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
               <TextInputField
                 placeholder="6-Digit Code"
                 value={roomId}
-                onChangeText={setRoomId}
+                onChangeText={(value) => setRoomId(value.toUpperCase())}
                 autoCapitalize="characters"
               />
               <View className="h-4" />

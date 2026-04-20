@@ -10,6 +10,7 @@ import SpeakerArea from '../components/SpeakerArea'
 import PushToTalkButton from '../components/PushToTalkButton'
 import BottomControls from '../components/BottomControls'
 import ChannelSelector from '../components/ChannelSelector'
+import SystemBanner from '../components/SystemBanner'
 import type { RoomScreenProps } from '../types'
 import useAppStore, { useMemberById, useMembersArray } from '../store/useAppStore'
 import { BACKEND_HOST } from '../config/network'
@@ -18,6 +19,8 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const room = useAppStore((s) => s.room)
   const socket = useAppStore((s) => s.socket)
   const deviceId = useAppStore((s) => s.deviceId)
+  const notice = useAppStore((s) => s.notice)
+  const setNotice = useAppStore((s) => s.setNotice)
   const members = useMembersArray()
   const mediasoupSession = useRef<any>(null)
   const mediasoupSessionLoad = useRef<Promise<void> | null>(null)
@@ -76,14 +79,52 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       navigation.navigate('Entry');
     };
 
+    const handleMicDenied = (data: { roomId?: string; channelId?: string; reason?: string }) => {
+      if (!data?.reason) return;
+
+      const messages: Record<string, { title: string; message: string; tone: 'warning' | 'error' }> = {
+        busy: {
+          title: 'Mic Busy',
+          message: 'Another operative is currently holding the channel mic.',
+          tone: 'warning',
+        },
+        'not-in-channel': {
+          title: 'Wrong Channel',
+          message: 'You need to join the channel before speaking.',
+          tone: 'warning',
+        },
+        'room-not-found': {
+          title: 'Room Missing',
+          message: 'This room no longer exists or could not be found.',
+          tone: 'error',
+        },
+        'channel-not-found': {
+          title: 'Channel Missing',
+          message: 'The current channel could not be found.',
+          tone: 'error',
+        },
+      };
+
+      const next = messages[data.reason];
+      if (!next) return;
+
+      setNotice({
+        tone: next.tone,
+        title: next.title,
+        message: next.message,
+      });
+    };
+
     socket.on('roomUpdated', handleRoomUpdated);
     socket.on('micStateUpdated', handleMicStateUpdated);
     socket.on('roomLeft', handleRoomLeft);
+    socket.on('micDenied', handleMicDenied);
 
     return () => {
       socket.off('roomUpdated', handleRoomUpdated);
       socket.off('micStateUpdated', handleMicStateUpdated);
       socket.off('roomLeft', handleRoomLeft);
+      socket.off('micDenied', handleMicDenied);
     };
   }, [socket, navigation]);
 
@@ -326,6 +367,13 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
           connectionState={connectionState} 
           onSharePress={onSharePress} 
         />
+
+        {notice && (
+          <SystemBanner
+            notice={notice}
+            onDismiss={() => setNotice(null)}
+          />
+        )}
         
         {mediasoupSession.current?.getLocalStream() && (
           <RTCView 

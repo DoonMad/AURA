@@ -46,6 +46,44 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    const socket = useAppStore.getState().socket;
+    if (!socket) {
+      return;
+    }
+
+    const handleConnectError = (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unable to reach the backend server.';
+      useAppStore.getState().setNotice({
+        tone: 'error',
+        title: 'Connection Failed',
+        message: message.includes('xhr poll error') || message.includes('websocket error')
+          ? 'The app cannot reach the backend server. Please check your network or server URL.'
+          : message,
+      });
+    };
+
+    const handleDisconnect = (reason: string) => {
+      if (reason === 'io client disconnect') {
+        return;
+      }
+
+      useAppStore.getState().setNotice({
+        tone: 'warning',
+        title: 'Disconnected',
+        message: 'The live connection dropped. The app will try to reconnect automatically.',
+      });
+    };
+
+    socket.on('connect_error', handleConnectError);
+    socket.on('disconnect', handleDisconnect);
+
+    return () => {
+      socket.off('connect_error', handleConnectError);
+      socket.off('disconnect', handleDisconnect);
+    };
+  }, [isReady]);
+
   if (!isReady) {
     return null;
   }
