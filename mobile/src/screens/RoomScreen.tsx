@@ -11,6 +11,8 @@ import PushToTalkButton from '../components/PushToTalkButton'
 import BottomControls from '../components/BottomControls'
 import ChannelSelector from '../components/ChannelSelector'
 import SystemBanner from '../components/SystemBanner'
+import ActivityToast from '../components/ActivityToast'
+import type { ActivityToastItem } from '../components/ActivityToast'
 import type { RoomScreenProps } from '../types'
 import useAppStore, { useMemberById, useMembersArray } from '../store/useAppStore'
 import { BACKEND_HOST } from '../config/network'
@@ -38,6 +40,17 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
   const [volume, setVolume] = useState(0.5)
   const [micPermissionGranted, setMicPermissionGranted] = useState(Platform.OS !== 'android')
+  const [activityToasts, setActivityToasts] = useState<ActivityToastItem[]>([])
+  let toastCounter = useRef(0)
+
+  const addActivityToast = (message: string, type: 'join' | 'leave') => {
+    const id = `toast-${Date.now()}-${toastCounter.current++}`;
+    setActivityToasts((prev) => [...prev.slice(-4), { id, message, type }]);
+  };
+
+  const removeActivityToast = (id: string) => {
+    setActivityToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   useEffect(() => {
     if (!socket) return;
@@ -146,12 +159,24 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       }
     };
 
+    const handleUserJoined = (data: { name: string; deviceId: string }) => {
+      if (data.deviceId === deviceId) return;
+      addActivityToast(`${data.name} joined the room`, 'join');
+    };
+
+    const handleUserLeft = (data: { name: string; deviceId: string }) => {
+      if (data.deviceId === deviceId) return;
+      addActivityToast(`${data.name} left the room`, 'leave');
+    };
+
     socket.on('roomUpdated', handleRoomUpdated);
     socket.on('micStateUpdated', handleMicStateUpdated);
     socket.on('roomLeft', handleRoomLeft);
     socket.on('micGranted', handleMicGranted);
     socket.on('micDenied', handleMicDenied);
     socket.on('error', handleSocketError);
+    socket.on('userJoined', handleUserJoined);
+    socket.on('userLeft', handleUserLeft);
 
     return () => {
       socket.off('roomUpdated', handleRoomUpdated);
@@ -160,6 +185,8 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       socket.off('micGranted', handleMicGranted);
       socket.off('micDenied', handleMicDenied);
       socket.off('error', handleSocketError);
+      socket.off('userJoined', handleUserJoined);
+      socket.off('userLeft', handleUserLeft);
     };
   }, [socket, navigation, room?.id, selectedChannelId, sessionRestorePending]);
 
@@ -417,6 +444,8 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
             onDismiss={() => setNotice(null)}
           />
         )}
+
+        <ActivityToast toasts={activityToasts} onExpire={removeActivityToast} />
         
         {mediasoupSession.current?.getLocalStream() && (
           <RTCView 

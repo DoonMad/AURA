@@ -1,6 +1,6 @@
 import { NativeModules, Platform } from 'react-native';
 
-const DEFAULT_BACKEND_HOST = '80.225.238.88';
+const DEFAULT_BACKEND_HOST = '192.168.137.1';
 
 function getHostFromScriptUrl() {
   const scriptUrl = NativeModules.SourceCode?.scriptURL as string | undefined;

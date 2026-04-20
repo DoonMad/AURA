@@ -68,6 +68,7 @@ export default function registerRoomEventHandlers (socket, io) {
         
         socket.emit("roomJoined", { room, users: getUsersInRoom(room.id) });
         io.to(roomId).emit("roomUpdated", { room, users: getUsersInRoom(room.id) });
+        socket.to(roomId).emit("userJoined", { name: displayName, deviceId });
 
         console.log(displayName, deviceId, "joined room", roomId);
     });
@@ -81,8 +82,10 @@ export default function registerRoomEventHandlers (socket, io) {
         }
 
         const user = getUser(deviceId);
+        const userName = user?.name || 'Unknown';
         const currentChannelId = channelId || user?.currentChannelId;
 
+        socket.to(roomId).emit("userLeft", { name: userName, deviceId });
         removeUserFromRoom(room, deviceId);
         if (currentChannelId) {
             mediasoupManager.closePeerMedia(roomId, currentChannelId, deviceId).catch((error) => {
