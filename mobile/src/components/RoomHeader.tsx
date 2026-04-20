@@ -4,9 +4,15 @@ import type { ConnectionState, RoomHeaderProps } from '../types'
 import Icon from 'react-native-vector-icons/Feather'
 
 const statusDot: Record<ConnectionState, string> = {
-  connected: 'bg-aura-active shadow-glow-active',
-  reconnecting: 'bg-aura-standby shadow-glow-standby',
+  connected: 'bg-aura-active',
+  reconnecting: 'bg-aura-standby',
   disconnected: 'bg-aura-danger',
+}
+
+const statusLabel: Record<ConnectionState, string> = {
+  connected: 'CONNECTED',
+  reconnecting: 'RECONNECTING',
+  disconnected: 'OFFLINE',
 }
 
 export interface ExtendedRoomHeaderProps extends RoomHeaderProps {
@@ -25,7 +31,7 @@ const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionSta
           <View className="flex-row items-center mt-1">
             <View className={`w-1.5 h-1.5 rounded-full mr-2 ${statusDot[connectionState]}`} />
             <Text className="text-[10px] text-aura-muted uppercase tracking-[3px] font-bold">
-              Room ID: {roomLabel}
+              {statusLabel[connectionState]} · Room ID: {roomLabel}
             </Text>
           </View>
         </View>

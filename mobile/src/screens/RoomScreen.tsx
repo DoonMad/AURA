@@ -14,6 +14,7 @@ import SystemBanner from '../components/SystemBanner'
 import type { RoomScreenProps } from '../types'
 import useAppStore, { useMemberById, useMembersArray } from '../store/useAppStore'
 import { BACKEND_HOST } from '../config/network'
+import { triggerHaptic } from '../services/haptics'
 
 const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const room = useAppStore((s) => s.room)
@@ -21,6 +22,9 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const deviceId = useAppStore((s) => s.deviceId)
   const notice = useAppStore((s) => s.notice)
   const setNotice = useAppStore((s) => s.setNotice)
+  const connectionState = useAppStore((s) => s.connectionState)
+  const sessionRestorePending = useAppStore((s) => s.sessionRestorePending)
+  const setSessionRestorePending = useAppStore((s) => s.setSessionRestorePending)
   const members = useMembersArray()
   const mediasoupSession = useRef<any>(null)
   const mediasoupSessionLoad = useRef<Promise<void> | null>(null)
@@ -33,7 +37,6 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const channels = useMemo(() => (room ? Object.values(room.channels) : []), [room])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
   const [volume, setVolume] = useState(0.5)
-  const connectionState: 'connected' | 'reconnecting' | 'disconnected' = 'connected'
   const [micPermissionGranted, setMicPermissionGranted] = useState(Platform.OS !== 'android')
 
   useEffect(() => {
@@ -42,6 +45,11 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     const handleRoomUpdated = (data: { room: any; users: any[] }) => {
       if (!data?.room || !Array.isArray(data.users)) return;
       console.log('[room] roomUpdated', data.room.id, data.users.length);
+
+      if (sessionRestorePending && room?.id === data.room.id) {
+        setSessionRestorePending(false);
+        triggerHaptic('success');
+      }
 
       useAppStore.getState().setRoom(data.room);
       useAppStore.getState().setMembers(data.users);
@@ -79,6 +87,12 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       navigation.navigate('Entry');
     };
 
+    const handleMicGranted = (data: { roomId?: string; channelId?: string }) => {
+      if (!room || data.roomId !== room.id || data.channelId !== selectedChannelId) return;
+      setNotice(null);
+      triggerHaptic('success');
+    };
+
     const handleMicDenied = (data: { roomId?: string; channelId?: string; reason?: string }) => {
       if (!data?.reason) return;
 
@@ -113,20 +127,41 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
         title: next.title,
         message: next.message,
       });
+      triggerHaptic(next.tone === 'warning' ? 'warning' : 'error');
+    };
+
+    const handleSocketError = (error: any) => {
+      const message = typeof error?.message === 'string' ? error.message : 'Something went wrong while talking to the server.';
+      setNotice({
+        tone: 'error',
+        title: 'Server Error',
+        message,
+      });
+      triggerHaptic('error');
+
+      if (sessionRestorePending && /room not found/i.test(message)) {
+        mediasoupSession.current?.dispose();
+        useAppStore.getState().clearSession();
+        navigation.navigate('Entry');
+      }
     };
 
     socket.on('roomUpdated', handleRoomUpdated);
     socket.on('micStateUpdated', handleMicStateUpdated);
     socket.on('roomLeft', handleRoomLeft);
+    socket.on('micGranted', handleMicGranted);
     socket.on('micDenied', handleMicDenied);
+    socket.on('error', handleSocketError);
 
     return () => {
       socket.off('roomUpdated', handleRoomUpdated);
       socket.off('micStateUpdated', handleMicStateUpdated);
       socket.off('roomLeft', handleRoomLeft);
+      socket.off('micGranted', handleMicGranted);
       socket.off('micDenied', handleMicDenied);
+      socket.off('error', handleSocketError);
     };
-  }, [socket, navigation]);
+  }, [socket, navigation, room?.id, selectedChannelId, sessionRestorePending]);
 
   useEffect(() => {
     if (!InCallManager) {
@@ -206,6 +241,12 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   }, [socket]);
 
   useEffect(() => {
+    if (connectionState !== 'connected' || sessionRestorePending) {
+      mediasoupSession.current?.dispose();
+      setMediasoupReady(false);
+      return;
+    }
+
     if (!mediaSessionReady || !room || !deviceId || !selectedChannelId || !socket) {
       setMediasoupReady(false);
       return;
@@ -226,7 +267,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       setMediasoupReady(false);
       console.warn('Failed to initialize mediasoup session', error);
     });
-  }, [mediaSessionReady, micPermissionGranted, room?.id, selectedChannelId, deviceId, socket]);
+  }, [mediaSessionReady, micPermissionGranted, room?.id, selectedChannelId, deviceId, socket, connectionState]);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || micPermissionGranted) {
@@ -315,6 +356,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     pttHeldRef.current = true;
     pttInFlightRef.current = true;
     console.log('[ptt] pressIn create producer', room.id, selectedChannelId, deviceId);
+    triggerHaptic('light');
 
     try {
       await mediasoupSession.current?.ensureMicProducer();
@@ -335,6 +377,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     if (!socket || !room || !deviceId || !selectedChannelId) return;
     pttHeldRef.current = false;
     console.log('[ptt] pressOut releaseMic', room.id, selectedChannelId, deviceId);
+    triggerHaptic('light');
     socket.emit('releaseMic', { deviceId, roomId: room.id, channelId: selectedChannelId });
     mediasoupSession.current?.releaseMicProducer();
   }

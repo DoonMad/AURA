@@ -12,6 +12,7 @@ import uuid from 'react-native-uuid';
 import type { RootStackParamList } from './src/types/navigation';
 import useAppStore from './src/store/useAppStore';
 import getSocket from './src/services/socket';
+import { triggerHaptic } from './src/services/haptics';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -52,7 +53,25 @@ export default function App() {
       return;
     }
 
+    const handleConnect = () => {
+      const store = useAppStore.getState();
+      store.setConnectionState('connected');
+
+      if (store.notice?.title === 'Disconnected') {
+        store.setNotice(null);
+      }
+
+      if (store.sessionRestorePending && store.room && store.deviceId && store.displayName) {
+        socket.emit('joinRoom', {
+          deviceId: store.deviceId,
+          displayName: store.displayName,
+          roomId: store.room.id,
+        });
+      }
+    };
+
     const handleConnectError = (error: unknown) => {
+      useAppStore.getState().setConnectionState('reconnecting');
       const message = error instanceof Error ? error.message : 'Unable to reach the backend server.';
       useAppStore.getState().setNotice({
         tone: 'error',
@@ -61,6 +80,7 @@ export default function App() {
           ? 'The app cannot reach the backend server. Please check your network or server URL.'
           : message,
       });
+      triggerHaptic('error');
     };
 
     const handleDisconnect = (reason: string) => {
@@ -68,19 +88,51 @@ export default function App() {
         return;
       }
 
-      useAppStore.getState().setNotice({
+      const store = useAppStore.getState();
+      store.setConnectionState('reconnecting');
+      if (store.room) {
+        store.setSessionRestorePending(true);
+      }
+      store.setNotice({
         tone: 'warning',
         title: 'Disconnected',
         message: 'The live connection dropped. The app will try to reconnect automatically.',
       });
+      triggerHaptic('warning');
+    };
+
+    const handleReconnectAttempt = () => {
+      useAppStore.getState().setConnectionState('reconnecting');
+    };
+
+    const handleReconnect = () => {
+      handleConnect();
+    };
+
+    const handleReconnectError = () => {
+      useAppStore.getState().setConnectionState('reconnecting');
+      useAppStore.getState().setNotice({
+        tone: 'error',
+        title: 'Reconnect Failed',
+        message: 'The app is still trying to restore the connection.',
+      });
+      triggerHaptic('error');
     };
 
     socket.on('connect_error', handleConnectError);
     socket.on('disconnect', handleDisconnect);
+    socket.on('connect', handleConnect);
+    socket.on('reconnect_attempt', handleReconnectAttempt);
+    socket.on('reconnect', handleReconnect);
+    socket.on('reconnect_error', handleReconnectError);
 
     return () => {
       socket.off('connect_error', handleConnectError);
       socket.off('disconnect', handleDisconnect);
+      socket.off('connect', handleConnect);
+      socket.off('reconnect_attempt', handleReconnectAttempt);
+      socket.off('reconnect', handleReconnect);
+      socket.off('reconnect_error', handleReconnectError);
     };
   }, [isReady]);
 

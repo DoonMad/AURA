@@ -11,6 +11,7 @@
 
 import { create } from 'zustand';
 import type { Socket } from 'socket.io-client';
+import type { ConnectionState } from '../types/components';
 import type { Room, User } from '../types/models';
 
 export type AppNoticeTone = 'info' | 'success' | 'warning' | 'error';
@@ -35,6 +36,8 @@ interface AppState {
   room: Room | null;
   members: Map<string, User>;          // keyed by user.id for O(1) lookups
   notice: AppNotice | null;
+  connectionState: ConnectionState;
+  sessionRestorePending: boolean;
 
   // ── Actions ──
   setIdentity: (deviceId: string, displayName: string | null) => void;
@@ -45,6 +48,8 @@ interface AppState {
   updateMember: (user: User) => void;   // update a single member in-place
   clearSession: () => void;             // called on leave room / disconnect
   setNotice: (notice: AppNotice | null) => void;
+  setConnectionState: (state: ConnectionState) => void;
+  setSessionRestorePending: (value: boolean) => void;
 }
 
 /* ────────────────────────────────────────────
@@ -59,6 +64,8 @@ const useAppStore = create<AppState>((set) => ({
   room: null,
   members: new Map(),
   notice: null,
+  connectionState: 'disconnected',
+  sessionRestorePending: false,
 
   // ── Actions ──
   setIdentity: (deviceId, displayName) =>
@@ -84,10 +91,16 @@ const useAppStore = create<AppState>((set) => ({
     }),
 
   clearSession: () =>
-    set({ room: null, members: new Map(), notice: null }),
+    set({ room: null, members: new Map(), notice: null, sessionRestorePending: false }),
 
   setNotice: (notice) =>
     set({ notice }),
+
+  setConnectionState: (connectionState) =>
+    set({ connectionState }),
+
+  setSessionRestorePending: (sessionRestorePending) =>
+    set({ sessionRestorePending }),
 }));
 
 /* ────────────────────────────────────────────

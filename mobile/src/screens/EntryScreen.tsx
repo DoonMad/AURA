@@ -20,6 +20,7 @@ import TextInputField from '../components/TextInputField';
 import PrimaryButton from '../components/PrimaryButton';
 import SectionDivider from '../components/SectionDivider';
 import SystemBanner from '../components/SystemBanner';
+import { triggerHaptic } from '../services/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { EntryScreenProps, Room, User } from '../types';
 import useAppStore from '../store/useAppStore';
@@ -46,8 +47,10 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
     const handleRoomJoined = (data: { room: Room; users: User[] }) => {
       console.log('Room joined:', data.room);
       setNotice(null);
+      useAppStore.getState().setSessionRestorePending(false);
       useAppStore.getState().setRoom(data.room);
       useAppStore.getState().setMembers(data.users);
+      triggerHaptic('success');
       navigation.navigate('Room');
     };
 
@@ -58,6 +61,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
         title: 'Room Error',
         message,
       });
+      triggerHaptic('error');
     };
 
     socket.on('roomJoined', handleRoomJoined);
@@ -76,6 +80,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
         title: 'Missing Name',
         message: 'Please enter a display name before joining a room.',
       });
+      triggerHaptic('warning');
       return;
     }
     if (!socket || !deviceId) return;
@@ -86,6 +91,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
         title: 'Invalid Room',
         message: 'Enter the 6-character room code to join.',
       });
+      triggerHaptic('warning');
       return;
     }
     setNotice({
@@ -93,6 +99,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
       title: 'Joining Room',
       message: `Attempting to join ${trimmedRoomId}.`,
     });
+    triggerHaptic('light');
     useAppStore.getState().setDisplayName(displayName);
     await AsyncStorage.setItem('displayName', displayName);
     socket.emit('joinRoom', { deviceId, displayName, roomId: trimmedRoomId });
@@ -105,6 +112,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
         title: 'Missing Name',
         message: 'Please enter a display name before creating a room.',
       });
+      triggerHaptic('warning');
       return;
     }
     if (!socket || !deviceId) return;
@@ -113,6 +121,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
       title: 'Creating Room',
       message: 'Generating a new command room now.',
     });
+    triggerHaptic('light');
     useAppStore.getState().setDisplayName(displayName);
     await AsyncStorage.setItem('displayName', displayName);
     socket.emit('createRoom', { deviceId, displayName });
