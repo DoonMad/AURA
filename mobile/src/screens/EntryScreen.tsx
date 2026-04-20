@@ -26,11 +26,11 @@ import type { EntryScreenProps, Room, User } from '../types';
 import useAppStore from '../store/useAppStore';
 
 const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
-  const deviceId = useAppStore((s) => s.deviceId);
-  const socket = useAppStore((s) => s.socket);
-  const storedDisplayName = useAppStore((s) => s.displayName);
-  const notice = useAppStore((s) => s.notice);
-  const setNotice = useAppStore((s) => s.setNotice);
+  const deviceId = useAppStore(s => s.deviceId);
+  const socket = useAppStore(s => s.socket);
+  const storedDisplayName = useAppStore(s => s.displayName);
+  const notice = useAppStore(s => s.notice);
+  const setNotice = useAppStore(s => s.setNotice);
 
   const [displayName, setDisplayName] = useState(storedDisplayName ?? '');
   const [roomId, setRoomId] = useState('');
@@ -55,7 +55,10 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
     };
 
     const handleError = (error: any) => {
-      const message = typeof error?.message === 'string' ? error.message : 'Unable to join the room.';
+      const message =
+        typeof error?.message === 'string'
+          ? error.message
+          : 'Unable to join the room.';
       setNotice({
         tone: 'error',
         title: 'Room Error',
@@ -151,15 +154,11 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
           </View>
 
           {notice && (
-            <SystemBanner
-              notice={notice}
-              onDismiss={() => setNotice(null)}
-            />
+            <SystemBanner notice={notice} onDismiss={() => setNotice(null)} />
           )}
 
           {/* Form */}
           <View className="w-full max-w-sm mx-auto p-6 bg-surface rounded-2xl border border-aura-border shadow-lg">
-            
             <View className="mb-6">
               <Text className="text-xs text-aura-muted mb-2 font-bold uppercase tracking-wider">
                 Operative ID
@@ -189,7 +188,7 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
               <TextInputField
                 placeholder="6-Digit Code"
                 value={roomId}
-                onChangeText={(value) => setRoomId(value.toUpperCase())}
+                onChangeText={value => setRoomId(value.toUpperCase())}
                 autoCapitalize="characters"
               />
               <View className="h-4" />

@@ -234,6 +234,55 @@ export default class WalkieTalkieSession {
     return this.localStream;
   }
 
+  /**
+   * Returns connection quality as a level 0-4 based on live WebRTC transport stats.
+   * 0 = no data, 1 = poor, 2 = fair, 3 = good, 4 = excellent
+   */
+  async getConnectionQuality(): Promise<{ level: number; rtt: number | null; packetLoss: number | null }> {
+    const transport = this.sendTransport || this.recvTransport;
+    if (!transport || transport.closed) {
+      return { level: 0, rtt: null, packetLoss: null };
+    }
+
+    try {
+      const stats = await transport.getStats();
+      let rtt: number | null = null;
+      let packetLoss: number | null = null;
+
+      stats.forEach((report: any) => {
+        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+          if (typeof report.currentRoundTripTime === 'number') {
+            rtt = report.currentRoundTripTime * 1000;
+          }
+        }
+        if (report.type === 'remote-inbound-rtp') {
+          if (typeof report.roundTripTime === 'number') {
+            rtt = report.roundTripTime * 1000;
+          }
+          if (typeof report.fractionLost === 'number') {
+            packetLoss = report.fractionLost * 100;
+          }
+        }
+      });
+
+      let level = 4;
+      if (rtt !== null) {
+        if (rtt > 300) level = 1;
+        else if (rtt > 150) level = Math.min(level, 2);
+        else if (rtt > 80) level = Math.min(level, 3);
+      }
+      if (packetLoss !== null) {
+        if (packetLoss > 10) level = 1;
+        else if (packetLoss > 5) level = Math.min(level, 2);
+        else if (packetLoss > 2) level = Math.min(level, 3);
+      }
+
+      return { level, rtt, packetLoss };
+    } catch (e) {
+      return { level: 0, rtt: null, packetLoss: null };
+    }
+  }
+
   async releaseMicProducer() {
     this.micReleaseRequested = true;
 

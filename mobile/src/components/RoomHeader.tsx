@@ -2,6 +2,8 @@ import React from 'react'
 import { View, Text, TouchableOpacity } from 'react-native'
 import type { ConnectionState, RoomHeaderProps } from '../types'
 import Icon from 'react-native-vector-icons/Feather'
+import SignalBars from './SignalBars'
+import type { SignalLevel } from './SignalBars'
 
 const statusDot: Record<ConnectionState, string> = {
   connected: 'bg-aura-active',
@@ -17,16 +19,17 @@ const statusLabel: Record<ConnectionState, string> = {
 
 export interface ExtendedRoomHeaderProps extends RoomHeaderProps {
   onSharePress?: () => void;
+  signalLevel?: SignalLevel;
 }
 
-const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionState, onSharePress }) => {
+const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionState, onSharePress, signalLevel = 0 }) => {
   const roomLabel = typeof roomName === 'string' ? roomName : 'loading';
 
   return (
     <View className="flex-row items-center justify-between px-6 py-4 bg-surface/95 border-b border-aura-border z-30 w-full pt-5 shadow-lg">
       {/* Title & Connection Dot */}
-      <View className="flex-row items-center">
-        <View>
+      <View className="flex-row items-center flex-1">
+        <View className="flex-1">
           <Text className="text-2xl font-black text-primary tracking-[4px] uppercase">{roomName}</Text>
           <View className="flex-row items-center mt-1">
             <View className={`w-1.5 h-1.5 rounded-full mr-2 ${statusDot[connectionState]}`} />
@@ -39,6 +42,11 @@ const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionSta
 
       {/* Action Buttons */}
       <View className="flex-row items-center space-x-3">
+        {connectionState === 'connected' && (
+          <View className="mr-2">
+            <SignalBars level={signalLevel} />
+          </View>
+        )}
         {onSharePress && (
           <TouchableOpacity 
             onPress={onSharePress}

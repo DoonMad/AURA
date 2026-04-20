@@ -17,6 +17,7 @@ import type { RoomScreenProps } from '../types'
 import useAppStore, { useMemberById, useMembersArray } from '../store/useAppStore'
 import { BACKEND_HOST } from '../config/network'
 import { triggerHaptic } from '../services/haptics'
+import type { SignalLevel } from '../components/SignalBars'
 
 const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const room = useAppStore((s) => s.room)
@@ -42,6 +43,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const [micPermissionGranted, setMicPermissionGranted] = useState(Platform.OS !== 'android')
   const [activityToasts, setActivityToasts] = useState<ActivityToastItem[]>([])
   let toastCounter = useRef(0)
+  const [signalLevel, setSignalLevel] = useState<SignalLevel>(0)
 
   const addActivityToast = (message: string, type: 'join' | 'leave') => {
     const id = `toast-${Date.now()}-${toastCounter.current++}`;
@@ -296,10 +298,34 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     });
   }, [mediaSessionReady, micPermissionGranted, room?.id, selectedChannelId, deviceId, socket, connectionState]);
 
+  // ── Poll connection quality every 5s ──
+  useEffect(() => {
+    if (!mediasoupReady || !mediasoupSession.current) {
+      setSignalLevel(0);
+      return;
+    }
+
+    const poll = async () => {
+      try {
+        const quality = await mediasoupSession.current?.getConnectionQuality();
+        if (quality) {
+          setSignalLevel(quality.level as SignalLevel);
+        }
+      } catch (e) {
+        // silently ignore polling errors
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [mediasoupReady]);
+
   useEffect(() => {
     if (Platform.OS !== 'android' || micPermissionGranted) {
       return;
     }
+
 
     const requestWebRTCPermissions = async () => {
       try {
@@ -435,7 +461,8 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
         <RoomHeader 
           roomName={room?.id ?? 'Loading...'} 
           connectionState={connectionState} 
-          onSharePress={onSharePress} 
+          onSharePress={onSharePress}
+          signalLevel={signalLevel}
         />
 
         {notice && (
