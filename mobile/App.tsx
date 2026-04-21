@@ -14,6 +14,7 @@ import useAppStore from './src/store/useAppStore';
 import getSocket from './src/services/socket';
 import { triggerHaptic } from './src/services/haptics';
 import { Linking } from 'react-native';
+import { BackgroundService } from './src/services/BackgroundService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -22,6 +23,7 @@ export default function App() {
 
   useEffect(() => {
     const init = async () => {
+      await BackgroundService.init();
       // ── Load or create deviceId ──
       let id = await AsyncStorage.getItem('deviceId');
       if (!id) {
@@ -38,6 +40,7 @@ export default function App() {
       // ── Create the socket connection once and store it globally ──
       const socket = getSocket();
       useAppStore.getState().setSocket(socket);
+      useAppStore.getState().setConnectionState(socket.connected ? 'connected' : 'disconnected');
 
       setIsReady(true);
     };
@@ -154,6 +157,12 @@ export default function App() {
     socket.on('reconnect_attempt', handleReconnectAttempt);
     socket.on('reconnect', handleReconnect);
     socket.on('reconnect_error', handleReconnectError);
+
+    // If the socket connected before this effect attached listeners,
+    // sync the store immediately so room initialization is not blocked.
+    if (socket.connected) {
+      handleConnect();
+    }
 
     return () => {
       socket.off('connect_error', handleConnectError);

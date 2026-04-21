@@ -19,6 +19,7 @@ import { BACKEND_URL } from '../config/network'
 import { triggerHaptic } from '../services/haptics'
 import type { SignalLevel } from '../components/SignalBars'
 import InviteModal from '../components/InviteModal'
+import { BackgroundService } from '../services/BackgroundService'
 
 const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const room = useAppStore((s) => s.room)
@@ -34,14 +35,19 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const mediasoupSessionLoad = useRef<Promise<void> | null>(null)
   const pttInFlightRef = useRef(false)
   const pttHeldRef = useRef(false)
+  const backgroundServiceActiveRef = useRef(false)
+  const backgroundServiceSyncingRef = useRef(false)
   const [mediaSessionReady, setMediaSessionReady] = useState(false)
   const [mediasoupReady, setMediasoupReady] = useState(false)
   const [tracksVersion, setTracksVersion] = useState(0)
 
   const channels = useMemo(() => (room ? Object.values(room.channels) : []), [room])
   const [selectedChannelId, setSelectedChannelId] = useState<string>('')
+  const selectedChannel = useMemo(() => channels?.find((c) => c.id === selectedChannelId), [channels, selectedChannelId])
+  const activeSpeakerId = selectedChannel?.activeSpeaker || null
   const [volume, setVolume] = useState(0.5)
   const [micPermissionGranted, setMicPermissionGranted] = useState(Platform.OS !== 'android')
+  const [notificationPermissionGranted, setNotificationPermissionGranted] = useState(Platform.OS !== 'android')
   const [activityToasts, setActivityToasts] = useState<ActivityToastItem[]>([])
   let toastCounter = useRef(0)
   const [signalLevel, setSignalLevel] = useState<SignalLevel>(0)
@@ -100,6 +106,10 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     const handleRoomLeft = () => {
       console.log('[room] roomLeft received');
       mediasoupSession.current?.dispose();
+      if (Platform.OS === 'android' && backgroundServiceActiveRef.current) {
+        void BackgroundService.stopService();
+        backgroundServiceActiveRef.current = false;
+      }
       useAppStore.getState().clearSession();
       navigation.navigate('Entry');
     };
@@ -324,42 +334,127 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   }, [mediasoupReady]);
 
   useEffect(() => {
-    if (Platform.OS !== 'android' || micPermissionGranted) {
+    if (Platform.OS !== 'android') return;
+
+    const canRunService = !!room?.id && micPermissionGranted && notificationPermissionGranted;
+
+    const syncForegroundService = async () => {
+      if (backgroundServiceSyncingRef.current) {
+        return;
+      }
+
+      backgroundServiceSyncingRef.current = true;
+
+      try {
+        if (!canRunService) {
+          if (backgroundServiceActiveRef.current) {
+            await BackgroundService.stopService();
+            backgroundServiceActiveRef.current = false;
+          }
+          return;
+        }
+
+        const roomName = room?.id ?? 'UNKNOWN';
+        const channelName = selectedChannelId || 'ALPHA';
+        const speaker = mediasoupReady ? members.find((m) => m.id === activeSpeakerId) : null;
+
+        if (!backgroundServiceActiveRef.current) {
+          await BackgroundService.startService(
+            roomName,
+            channelName,
+            mediasoupReady ? undefined : 'Connecting to live session...',
+          );
+          backgroundServiceActiveRef.current = true;
+          return;
+        }
+
+        await BackgroundService.updateSpeakerStatus(
+          roomName,
+          channelName,
+          speaker ? speaker.name : null,
+        );
+      } catch (error) {
+        console.warn('[BackgroundService] Failed to sync foreground service:', error);
+      } finally {
+        backgroundServiceSyncingRef.current = false;
+      }
+    };
+
+    void syncForegroundService();
+
+    return () => {
+      if (!canRunService && backgroundServiceActiveRef.current) {
+        void BackgroundService.stopService();
+        backgroundServiceActiveRef.current = false;
+      }
+    };
+  }, [room?.id, selectedChannelId, micPermissionGranted, notificationPermissionGranted, mediasoupReady, activeSpeakerId, members]);
+
+  // ── Debug Audio Connection ──
+  useEffect(() => {
+    if (!mediasoupReady || !mediasoupSession.current) return;
+    
+    const checkIce = async () => {
+      try {
+        const stats = await mediasoupSession.current.getStats();
+        // Log the state of the send transport
+        console.log('[RoomScreen] Audio ICE State:', stats.sendTransport?.iceState || 'unknown');
+      } catch (e) {
+        // ignore stats errors
+      }
+    };
+
+    const interval = setInterval(checkIce, 3000);
+    return () => clearInterval(interval);
+  }, [mediasoupReady]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
       return;
     }
-
 
     const requestWebRTCPermissions = async () => {
       try {
         const permissionsToRequest = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+        
+        if (Number(Platform.Version) >= 33) {
+          permissionsToRequest.push(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        }
+        
         if (Number(Platform.Version) >= 31) {
            permissionsToRequest.push(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
         }
         
         const results = await PermissionsAndroid.requestMultiple(permissionsToRequest);
         const recordAudioGranted = results[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+        const notificationsGranted =
+          Number(Platform.Version) < 33 ||
+          results[PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS] === PermissionsAndroid.RESULTS.GRANTED;
+        
         setMicPermissionGranted(recordAudioGranted);
+        setNotificationPermissionGranted(notificationsGranted);
       } catch (error) {
         console.warn('Failed to request permissions', error);
       }
     };
+    
     requestWebRTCPermissions();
-  }, [micPermissionGranted]);
+  }, []);
 
   useEffect(() => {
     return () => {
       mediasoupSession.current?.dispose();
       mediasoupSession.current = null;
+      if (Platform.OS === 'android' && backgroundServiceActiveRef.current) {
+        void BackgroundService.stopService();
+        backgroundServiceActiveRef.current = false;
+      }
     };
   }, []);
 
-  const selectedChannel = channels?.find((c) => c.id === selectedChannelId)
   const currentIndex = channels.findIndex(ch => ch.id === selectedChannelId)
-
   const membersInChannel = selectedChannel?.members?.length ?? 0
   const totalMembers = members.length
-
-  const activeSpeakerId = selectedChannel?.activeSpeaker
   const activeSpeaker = useMemberById(activeSpeakerId)
 
   let talkState: 'idle' | 'ready' | 'speaking_self' | 'speaking_other' = 'idle';
@@ -378,6 +473,10 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     socket.emit('leaveRoom', { deviceId, roomId: room.id, channelId: selectedChannelId })
     mediasoupSession.current?.releaseMicProducer()
     mediasoupSession.current?.dispose()
+    if (Platform.OS === 'android' && backgroundServiceActiveRef.current) {
+      void BackgroundService.stopService()
+      backgroundServiceActiveRef.current = false
+    }
     useAppStore.getState().clearSession()
     navigation.navigate('Entry')
   }
