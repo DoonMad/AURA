@@ -29,11 +29,42 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
   const deviceId = useAppStore(s => s.deviceId);
   const socket = useAppStore(s => s.socket);
   const storedDisplayName = useAppStore(s => s.displayName);
+  const pendingDeepLinkRoomId = useAppStore(s => s.pendingDeepLinkRoomId);
   const notice = useAppStore(s => s.notice);
   const setNotice = useAppStore(s => s.setNotice);
 
   const [displayName, setDisplayName] = useState(storedDisplayName ?? '');
   const [roomId, setRoomId] = useState('');
+
+  // ── Handle Pending Deep Link ──
+  useEffect(() => {
+    if (pendingDeepLinkRoomId) {
+      console.log('[EntryScreen] Consuming pending deep link:', pendingDeepLinkRoomId);
+      setRoomId(pendingDeepLinkRoomId);
+      
+      // Clear the pending ID so we don't process it again
+      useAppStore.getState().setPendingDeepLinkRoomId(null);
+
+      // If we already have a name, let's try to join automatically
+      if (displayName || storedDisplayName) {
+        // We need to wait a tick for setRoomId state to reflect or just use the value directly
+        const nameToUse = displayName || storedDisplayName;
+        console.log('[EntryScreen] Auto-joining room via deep link as:', nameToUse);
+        
+        if (socket && deviceId) {
+          useAppStore.getState().setDisplayName(nameToUse!);
+          // We can't call handleJoinRoom directly because it relies on state 
+          // that might not be updated yet. So we duplicate the emit logic here.
+          setNotice({
+            tone: 'info',
+            title: 'Joining Room',
+            message: `Auto-joining freq: ${pendingDeepLinkRoomId}.`,
+          });
+          socket.emit('joinRoom', { deviceId, displayName: nameToUse, roomId: pendingDeepLinkRoomId });
+        }
+      }
+    }
+  }, [pendingDeepLinkRoomId, socket, deviceId, displayName, storedDisplayName]);
 
   useEffect(() => {
     if (storedDisplayName) {

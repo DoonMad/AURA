@@ -15,9 +15,10 @@ import ActivityToast from '../components/ActivityToast'
 import type { ActivityToastItem } from '../components/ActivityToast'
 import type { RoomScreenProps } from '../types'
 import useAppStore, { useMemberById, useMembersArray } from '../store/useAppStore'
-import { BACKEND_HOST } from '../config/network'
+import { BACKEND_URL } from '../config/network'
 import { triggerHaptic } from '../services/haptics'
 import type { SignalLevel } from '../components/SignalBars'
+import InviteModal from '../components/InviteModal'
 
 const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const room = useAppStore((s) => s.room)
@@ -44,6 +45,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const [activityToasts, setActivityToasts] = useState<ActivityToastItem[]>([])
   let toastCounter = useRef(0)
   const [signalLevel, setSignalLevel] = useState<SignalLevel>(0)
+  const [showInviteModal, setShowInviteModal] = useState(false)
 
   const addActivityToast = (message: string, type: 'join' | 'leave') => {
     const id = `toast-${Date.now()}-${toastCounter.current++}`;
@@ -380,19 +382,9 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     navigation.navigate('Entry')
   }
 
-  const onSharePress = async () => {
-    if (!room) return;
-    try {
-      const url = `${BACKEND_HOST}/room/${room.id}`;
-      const result = await Share.share({
-        message: `Join my AURA room: ${url}`,
-        title: 'AURA Room Invite',
-        url,
-      });
-      console.log('Share result', result);
-    } catch (error) {
-      console.warn('Share failed', error);
-    }
+  const onSharePress = () => {
+    setShowInviteModal(true);
+    triggerHaptic('light');
   }
 
   const onTalkPressIn = async () => {
@@ -473,6 +465,12 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
         )}
 
         <ActivityToast toasts={activityToasts} onExpire={removeActivityToast} />
+        
+        <InviteModal 
+          isVisible={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          roomId={room?.id ?? ''}
+        />
         
         {mediasoupSession.current?.getLocalStream() && (
           <RTCView 

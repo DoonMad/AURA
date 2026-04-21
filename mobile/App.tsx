@@ -13,6 +13,7 @@ import type { RootStackParamList } from './src/types/navigation';
 import useAppStore from './src/store/useAppStore';
 import getSocket from './src/services/socket';
 import { triggerHaptic } from './src/services/haptics';
+import { Linking } from 'react-native';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -45,6 +46,34 @@ export default function App() {
       console.warn('Failed to initialize app storage:', error);
       setIsReady(true);
     });
+  }, []);
+
+  // ── Handle Deep Links ──
+  useEffect(() => {
+    const handleDeepLink = (url: string | null) => {
+      if (!url) return;
+
+      console.log('[App] Deep link received:', url);
+      // Expected format: aura://join/ABCDEF
+      const match = url.match(/aura:\/\/join\/([A-Z0-9]+)/i);
+      if (match && match[1]) {
+        const roomId = match[1].toUpperCase();
+        console.log('[App] Parsed Room ID from deep link:', roomId);
+        useAppStore.getState().setPendingDeepLinkRoomId(roomId);
+      }
+    };
+
+    // Handle link when app is cold-booted
+    Linking.getInitialURL().then(handleDeepLink);
+
+    // Handle link when app is already running
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   useEffect(() => {

@@ -50,6 +50,8 @@ interface AppState {
   setNotice: (notice: AppNotice | null) => void;
   setConnectionState: (state: ConnectionState) => void;
   setSessionRestorePending: (value: boolean) => void;
+  pendingDeepLinkRoomId: string | null;
+  setPendingDeepLinkRoomId: (roomId: string | null) => void;
 }
 
 /* ────────────────────────────────────────────
@@ -66,6 +68,7 @@ const useAppStore = create<AppState>((set) => ({
   notice: null,
   connectionState: 'disconnected',
   sessionRestorePending: false,
+  pendingDeepLinkRoomId: null,
 
   // ── Actions ──
   setIdentity: (deviceId, displayName) =>
@@ -101,6 +104,9 @@ const useAppStore = create<AppState>((set) => ({
 
   setSessionRestorePending: (sessionRestorePending) =>
     set({ sessionRestorePending }),
+
+  setPendingDeepLinkRoomId: (pendingDeepLinkRoomId) =>
+    set({ pendingDeepLinkRoomId }),
 }));
 
 /* ────────────────────────────────────────────
