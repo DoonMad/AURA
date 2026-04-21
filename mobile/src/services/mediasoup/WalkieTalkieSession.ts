@@ -1,8 +1,15 @@
 import { Device } from 'mediasoup-client';
 import type { types as MediasoupTypes } from 'mediasoup-client';
-import { mediaDevices, MediaStream } from 'react-native-webrtc';
+import { MediaStream } from 'react-native-webrtc';
 import type { Socket } from 'socket.io-client';
 import { setupWebRTC } from '../webrtc/setupWebRTC';
+import {
+  ExternalStreamAudioCaptureSource,
+  PhoneMicAudioCaptureSource,
+  type AudioCaptureLease,
+  type AudioCaptureSource,
+  type AudioCaptureSourceKind,
+} from './audioCapture';
 
 type SocketAck<T> = {
   ok: true;
@@ -76,6 +83,8 @@ export default class WalkieTalkieSession {
   private micProducer: Producer | null = null;
   private micProducerPromise: Promise<Producer> | null = null;
   private localStream: MediaStream | null = null;
+  private activeAudioCaptureLease: AudioCaptureLease | null = null;
+  private audioCaptureSource: AudioCaptureSource = new PhoneMicAudioCaptureSource();
   private micReleaseRequested = false;
   private initialized = false;
   private pendingConsumers = new Set<string>();
@@ -217,8 +226,11 @@ export default class WalkieTalkieSession {
     this.recvTransport = null;
 
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
       this.localStream = null;
+    }
+
+    if (this.activeAudioCaptureLease) {
+      await this.releaseCaptureLease('[mediasoup] failed to release active audio capture lease during dispose');
     }
 
     this.device = null;
@@ -232,6 +244,26 @@ export default class WalkieTalkieSession {
 
   getLocalStream() {
     return this.localStream;
+  }
+
+  getAudioSourceKind(): AudioCaptureSourceKind {
+    return this.audioCaptureSource.kind;
+  }
+
+  usePhoneMicSource() {
+    this.audioCaptureSource = new PhoneMicAudioCaptureSource();
+    if (this.micProducer || this.localStream) {
+      void this.releaseMicProducer();
+    }
+  }
+
+  useExternalAudioStream(stream: MediaStream | null) {
+    this.audioCaptureSource = stream
+      ? new ExternalStreamAudioCaptureSource(stream)
+      : new PhoneMicAudioCaptureSource();
+    if (this.micProducer || this.localStream) {
+      void this.releaseMicProducer();
+    }
   }
 
   /**
@@ -303,18 +335,29 @@ export default class WalkieTalkieSession {
     }
 
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
-        try {
-          track.stop();
-        } catch (error) {
-          console.warn('[mediasoup] failed to stop local track', error);
-        }
-      });
       this.localStream = null;
       this.onTracksUpdated?.();
     }
 
+    if (this.activeAudioCaptureLease) {
+      await this.releaseCaptureLease('[mediasoup] failed to release audio capture lease');
+    }
+
     this.micProducer = null;
+  }
+
+  private async releaseCaptureLease(warningPrefix: string = '[mediasoup] failed to release audio capture lease') {
+    if (!this.activeAudioCaptureLease) {
+      return;
+    }
+
+    try {
+      await this.activeAudioCaptureLease.release();
+    } catch (error) {
+      console.warn(warningPrefix, error);
+    } finally {
+      this.activeAudioCaptureLease = null;
+    }
   }
 
   private onTracksUpdated: (() => void) | null = null;
@@ -474,46 +517,8 @@ export default class WalkieTalkieSession {
       }
 
       const existingProducer = this.micProducer;
-        console.log('[mediasoup] reattaching mic track to existing producer', this.micProducer.id);
-        this.micProducerPromise = (async () => {
-        console.log('[mediasoup] requesting microphone access');
-        let stream: MediaStream;
-        try {
-          stream = await mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            },
-            video: false
-          });
-        } catch (err) {
-          console.error('[mediasoup] getUserMedia failed', err);
-          throw err;
-        }
-
-        console.log('[mediasoup] getUserMedia ok', {
-          audioTracks: stream.getAudioTracks().length,
-          videoTracks: stream.getVideoTracks().length
-        });
-
-        this.localStream = stream;
-        this.onTracksUpdated?.();
-
-        const audioTrack = stream.getAudioTracks()[0];
-        if (!audioTrack) {
-          throw new Error('Microphone track is not available');
-        }
-
-        audioTrack.enabled = true;
-        console.log('[mediasoup] audio track ready', audioTrack.id);
-        console.log('[mediasoup] replacing existing producer track');
-        await existingProducer.replaceTrack({ track: audioTrack });
-        audioTrack.enabled = true;
-        console.log('[mediasoup] existing mic producer reattached', existingProducer.id);
-        return existingProducer;
-      })();
-
+      console.log('[mediasoup] reattaching audio source to existing producer', this.micProducer.id);
+      this.micProducerPromise = this.attachAudioSourceToProducer(existingProducer);
       try {
         const producer = await this.micProducerPromise;
         console.log('[mediasoup] mic producer ready', producer.id);
@@ -526,100 +531,8 @@ export default class WalkieTalkieSession {
       }
     }
 
-      console.log('[mediasoup] creating mic producer');
-      this.micProducerPromise = (async () => {
-      console.log('[mediasoup] requesting microphone access');
-      let stream: MediaStream;
-      try {
-        stream = await mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-          video: false
-        });
-      } catch (err) {
-        console.error('[mediasoup] getUserMedia failed', err);
-        throw err;
-      }
-
-      console.log('[mediasoup] getUserMedia ok', {
-        audioTracks: stream.getAudioTracks().length,
-        videoTracks: stream.getVideoTracks().length
-      });
-
-      this.localStream = stream;
-      this.onTracksUpdated?.();
-
-      const audioTrack = stream.getAudioTracks()[0];
-      if (!audioTrack) {
-        throw new Error('Microphone track is not available');
-      }
-
-      audioTrack.enabled = true;
-
-
-      console.log('[mediasoup] audio track ready', audioTrack.id);
-
-      console.log('[mediasoup] calling transport.produce');
-      const producer = await (this.sendTransport! as any).produce({
-        track: audioTrack,
-        paused: true,
-        stopTracks: false,
-        appData: {
-          source: 'microphone',
-          startPaused: true
-        }
-      });
-      console.log('[mediasoup] producer created', producer.id);
-
-      this.micProducer = producer;
-
-      producer.on('@close', () => {
-        console.log('[mediasoup] mic producer closed');
-        if (this.localStream) {
-          this.localStream.getTracks().forEach((track) => {
-            try {
-              track.stop();
-            } catch (error) {
-              console.warn('[mediasoup] failed to stop track after producer close', error);
-            }
-          });
-          this.localStream = null;
-          this.onTracksUpdated?.();
-        }
-      });
-
-      // --- SENDER DIAGNOSTICS LOG ---
-      const outInterval = setInterval(() => {
-        if (producer.closed) {
-          clearInterval(outInterval);
-          return;
-        }
-        producer.getStats().then((stats: any) => {
-          stats.forEach((stat: any) => {
-            if (stat.type === 'outbound-rtp') {
-              console.log(`[RTP OUTBOUND] Audio Bytes Sent: ${stat.bytesSent}`);
-            }
-          });
-        }).catch(() => {});
-      }, 2000);
-      producer.on('transportclose', () => clearInterval(outInterval));
-      // ------------------------------
-
-      if (this.micReleaseRequested) {
-        console.log('[mediasoup] mic release requested during producer creation; cleaning up');
-        try {
-          producer.close();
-        } catch (error) {
-          console.warn('[mediasoup] failed to close producer during release cleanup', error);
-        }
-        throw new Error('Mic release requested before producer was ready');
-      }
-
-      return producer;
-    })();
+    console.log('[mediasoup] creating mic producer');
+    this.micProducerPromise = this.createProducerFromCurrentSource();
 
     try {
       const producer = await this.micProducerPromise;
@@ -631,6 +544,112 @@ export default class WalkieTalkieSession {
     } finally {
       this.micProducerPromise = null;
     }
+  }
+
+  private async attachAudioSourceToProducer(existingProducer: Producer) {
+    const lease = await this.audioCaptureSource.acquire();
+    const stream = lease.stream;
+    this.activeAudioCaptureLease = lease;
+
+    console.log('[mediasoup] capture source ready', {
+      source: lease.kind,
+      audioTracks: stream.getAudioTracks().length,
+      videoTracks: stream.getVideoTracks().length
+    });
+
+    this.localStream = stream;
+    this.onTracksUpdated?.();
+
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack) {
+      throw new Error('Microphone track is not available');
+    }
+
+    audioTrack.enabled = true;
+    console.log('[mediasoup] audio track ready', audioTrack.id);
+    console.log('[mediasoup] replacing existing producer track');
+    await existingProducer.replaceTrack({ track: audioTrack });
+    audioTrack.enabled = true;
+    console.log('[mediasoup] existing mic producer reattached', existingProducer.id);
+    return existingProducer;
+  }
+
+  private async createProducerFromCurrentSource() {
+    if (!this.sendTransport) {
+      throw new Error('Send transport is not ready');
+    }
+
+    const lease = await this.audioCaptureSource.acquire();
+    const stream = lease.stream;
+    this.activeAudioCaptureLease = lease;
+
+    console.log('[mediasoup] capture source ready', {
+      source: lease.kind,
+      audioTracks: stream.getAudioTracks().length,
+      videoTracks: stream.getVideoTracks().length
+    });
+
+    this.localStream = stream;
+    this.onTracksUpdated?.();
+
+    const audioTrack = stream.getAudioTracks()[0];
+    if (!audioTrack) {
+      throw new Error('Microphone track is not available');
+    }
+
+    audioTrack.enabled = true;
+    console.log('[mediasoup] audio track ready', audioTrack.id);
+    console.log('[mediasoup] calling transport.produce');
+    const producer = await (this.sendTransport as any).produce({
+      track: audioTrack,
+      paused: true,
+      stopTracks: false,
+      appData: {
+        source: this.audioCaptureSource.kind,
+        startPaused: true
+      }
+    });
+    console.log('[mediasoup] producer created', producer.id);
+
+    this.micProducer = producer;
+
+    producer.on('@close', () => {
+      console.log('[mediasoup] mic producer closed');
+      if (this.localStream) {
+        this.localStream = null;
+        this.onTracksUpdated?.();
+      }
+      void this.releaseCaptureLease('[mediasoup] failed to release capture lease after producer close');
+      this.micProducer = null;
+    });
+
+    const outInterval = setInterval(() => {
+      if (producer.closed) {
+        clearInterval(outInterval);
+        return;
+      }
+      producer.getStats().then((stats: any) => {
+        stats.forEach((stat: any) => {
+          if (stat.type === 'outbound-rtp') {
+            console.log(`[RTP OUTBOUND] Audio Bytes Sent: ${stat.bytesSent}`);
+          }
+        });
+      }).catch(() => {});
+    }, 2000);
+    producer.on('transportclose', () => clearInterval(outInterval));
+
+    if (this.micReleaseRequested) {
+      console.log('[mediasoup] mic release requested during producer creation; cleaning up');
+      try {
+        producer.close();
+      } catch (error) {
+        console.warn('[mediasoup] failed to close producer during release cleanup', error);
+      }
+      await this.releaseCaptureLease();
+      throw new Error('Mic release requested before producer was ready');
+    }
+
+    return producer;
   }
 
   private async consumeExistingProducers() {
