@@ -19,6 +19,7 @@ export type Channel = {
 
 export type Room = {
   id: string;
+  ownerId: string;
   admins: string[];
   members: string[];
   pastMembers: string[];

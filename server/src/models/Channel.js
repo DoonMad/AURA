@@ -15,4 +15,15 @@ export default class Channel {
     removeMember(deviceId) {
         this.members = this.members.filter((memberId) => memberId !== deviceId);
     }
+
+    isEmpty() {
+        return this.members.length === 0;
+    }
+
+    rename(name) {
+        const nextName = typeof name === "string" ? name.trim() : "";
+        if (nextName.length > 0) {
+            this.name = nextName;
+        }
+    }
 }

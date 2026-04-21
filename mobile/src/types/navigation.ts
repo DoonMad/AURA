@@ -8,6 +8,7 @@
 export type RootStackParamList = {
   Entry: undefined;
   Room: undefined;
+  Admin: undefined;
   Members: undefined;
   MicTester: undefined;
 };

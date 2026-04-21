@@ -2,6 +2,7 @@ import { getRoom, createRoom, removeRoom } from "../repositories/roomRepository.
 import { removeUser, getUsersInRoom, createUser, getUser } from "../repositories/userRepository.js";
 import { createChannelRoomKey } from "./mediasoupHandler.js";
 import mediasoupManager from "../mediasoup/mediasoupManager.js";
+import { removeMemberFromRoomState } from "../utils/roomHelpers.js";
 
 function addUserToChannel(room, channelId, deviceId) {
     const channel = room.getChannel(channelId);
@@ -15,16 +16,6 @@ function addUserToChannel(room, channelId, deviceId) {
         user.currentChannelId = channelId;
     }
     return channel;
-}
-
-function removeUserFromRoom(room, deviceId) {
-    room.removeMember(deviceId);
-    for (const channel of Object.values(room.channels)) {
-        channel.removeMember(deviceId);
-        if (channel.activeSpeaker === deviceId) {
-            channel.activeSpeaker = null;
-        }
-    }
 }
 
 export default function registerRoomEventHandlers (socket, io) {
@@ -86,7 +77,7 @@ export default function registerRoomEventHandlers (socket, io) {
         const currentChannelId = channelId || user?.currentChannelId;
 
         socket.to(roomId).emit("userLeft", { name: userName, deviceId });
-        removeUserFromRoom(room, deviceId);
+        removeMemberFromRoomState(room, deviceId);
         if (currentChannelId) {
             mediasoupManager.closePeerMedia(roomId, currentChannelId, deviceId).catch((error) => {
                 console.warn("Failed to close mediasoup media on leaveRoom", error);
@@ -94,6 +85,11 @@ export default function registerRoomEventHandlers (socket, io) {
         }
         removeUser(deviceId);
         if(room.members.length === 0) {
+            for (const channel of Object.keys(room.channels)) {
+                mediasoupManager.closeChannel(roomId, channel).catch((error) => {
+                    console.warn("Failed to close mediasoup channel on room removal", error);
+                });
+            }
             removeRoom(roomId);
         }
 
@@ -110,4 +106,5 @@ export default function registerRoomEventHandlers (socket, io) {
         console.log(deviceId, "left room", roomId);
     });
 }
-    
+
+export { addUserToChannel };

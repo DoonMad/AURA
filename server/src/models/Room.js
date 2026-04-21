@@ -6,8 +6,10 @@ const ROOM_ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 export default class Room {
     constructor(id, adminDeviceId) {
         this.id = id;
+        this.ownerId = adminDeviceId;
         this.admins = [adminDeviceId];
         this.members = [adminDeviceId];
+        this.nextChannelNumber = 9;
         this.channels = {
             "channel-1": new Channel("channel-1", "Channel 1"),
             "channel-2": new Channel("channel-2", "Channel 2"),
@@ -44,5 +46,53 @@ export default class Room {
 
     addChannel(channel) {
         this.channels[channel.id] = channel;
+    }
+
+    createChannel(channelName) {
+        const channelNumber = this.nextChannelNumber;
+        let channelId = "";
+        do {
+            channelId = `channel-${this.nextChannelNumber++}`;
+        } while (this.channels[channelId]);
+
+        const name = typeof channelName === "string" && channelName.trim().length > 0
+            ? channelName.trim()
+            : `Channel ${channelNumber}`;
+
+        const channel = new Channel(channelId, name);
+        this.addChannel(channel);
+        return channel;
+    }
+
+    removeChannel(channelId) {
+        delete this.channels[channelId];
+    }
+
+    addAdmin(deviceId) {
+        if (!this.admins.includes(deviceId)) {
+            this.admins.push(deviceId);
+        }
+    }
+
+    removeAdmin(deviceId) {
+        if (deviceId === this.ownerId) {
+            return;
+        }
+        this.admins = this.admins.filter((adminId) => adminId !== deviceId);
+    }
+
+    ensureAdminPresence() {
+        if (this.admins.length === 0 && this.members.length > 0) {
+            this.admins = [this.members[0]];
+            this.ownerId = this.members[0];
+        }
+    }
+
+    isAdmin(deviceId) {
+        return this.admins.includes(deviceId);
+    }
+
+    isOwner(deviceId) {
+        return this.ownerId === deviceId;
     }
 }

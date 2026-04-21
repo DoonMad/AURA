@@ -50,6 +50,7 @@ export interface RoomHeaderProps {
   roomName: string;
   connectionState: ConnectionState;
   onSharePress?: () => void;
+  onAdminPress?: () => void;
 }
 
 
@@ -112,5 +113,4 @@ export interface SpeakerAreaProps {
  * ──────────────────────────────────────────── */
 
 export type Member = { id: string; name: string; isSpeaking?: boolean };
-
 

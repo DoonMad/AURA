@@ -19,10 +19,11 @@ const statusLabel: Record<ConnectionState, string> = {
 
 export interface ExtendedRoomHeaderProps extends RoomHeaderProps {
   onSharePress?: () => void;
+  onAdminPress?: () => void;
   signalLevel?: SignalLevel;
 }
 
-const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionState, onSharePress, signalLevel = 0 }) => {
+const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionState, onSharePress, onAdminPress, signalLevel = 0 }) => {
   const roomLabel = typeof roomName === 'string' ? roomName : 'loading';
 
   return (
@@ -54,6 +55,15 @@ const RoomHeader: React.FC<ExtendedRoomHeaderProps> = ({ roomName, connectionSta
             className="w-10 h-10 rounded-full bg-surface-lighter border border-aura-border items-center justify-center"
           >
             <Icon name="share-2" size={16} color="#FAFAFA" />
+          </TouchableOpacity>
+        )}
+        {onAdminPress && (
+          <TouchableOpacity 
+            onPress={onAdminPress}
+            activeOpacity={0.6}
+            className="w-10 h-10 rounded-full bg-surface-lighter border border-aura-border items-center justify-center"
+          >
+            <Icon name="settings" size={16} color="#FAFAFA" />
           </TouchableOpacity>
         )}
       </View>

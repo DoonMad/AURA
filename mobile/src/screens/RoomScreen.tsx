@@ -52,6 +52,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   let toastCounter = useRef(0)
   const [signalLevel, setSignalLevel] = useState<SignalLevel>(0)
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const isAdmin = !!room && !!deviceId && room.admins.includes(deviceId)
 
   const addActivityToast = (message: string, type: 'join' | 'leave') => {
     const id = `toast-${Date.now()}-${toastCounter.current++}`;
@@ -103,12 +104,20 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       }
     };
 
-    const handleRoomLeft = () => {
-      console.log('[room] roomLeft received');
+    const handleRoomLeft = (data?: { reason?: string }) => {
+      console.log('[room] roomLeft received', data?.reason ?? 'unknown');
       mediasoupSession.current?.dispose();
       if (Platform.OS === 'android' && backgroundServiceActiveRef.current) {
         void BackgroundService.stopService();
         backgroundServiceActiveRef.current = false;
+      }
+      if (data?.reason === 'kicked') {
+        setNotice({
+          tone: 'error',
+          title: 'Removed From Room',
+          message: 'An admin removed you from the room.',
+        });
+        triggerHaptic('error');
       }
       useAppStore.getState().clearSession();
       navigation.navigate('Entry');
@@ -486,6 +495,11 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     triggerHaptic('light');
   }
 
+  const onAdminPress = () => {
+    navigation.navigate('Admin');
+    triggerHaptic('light');
+  }
+
   const onTalkPressIn = async () => {
     if (!socket || !room || !deviceId || !selectedChannelId) return;
     if (!mediasoupReady) {
@@ -553,6 +567,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
           roomName={room?.id ?? 'Loading...'} 
           connectionState={connectionState} 
           onSharePress={onSharePress}
+          onAdminPress={isAdmin ? onAdminPress : undefined}
           signalLevel={signalLevel}
         />
 
