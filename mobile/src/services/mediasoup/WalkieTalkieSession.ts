@@ -3,6 +3,7 @@ import type { types as MediasoupTypes } from 'mediasoup-client';
 import { MediaStream } from 'react-native-webrtc';
 import type { Socket } from 'socket.io-client';
 import { setupWebRTC } from '../webrtc/setupWebRTC';
+import { WatchBridgeService, type WatchRoomState } from '../watchBridge';
 import {
   ExternalStreamAudioCaptureSource,
   PhoneMicAudioCaptureSource,
@@ -107,10 +108,26 @@ export default class WalkieTalkieSession {
     this.removeRemoteConsumer(event.producerId);
   };
 
-  private readonly handleProducerState = (event: { roomId: string; channelId: string; activeSpeaker: string | null }) => {
+  private readonly handleProducerState = (event: {
+    roomId: string;
+    channelId: string;
+    activeSpeaker: string | null;
+    users: any[];
+  }) => {
     if (!this.matchesChannel(event.roomId, event.channelId)) {
       return;
     }
+
+    const activeSpeakerUser = event.users?.find((u: any) => u.id === event.activeSpeaker);
+
+    // Sync speaker to watch
+    WatchBridgeService.sendMessage(
+      '/speaker_update',
+      JSON.stringify({
+        activeSpeakerName: activeSpeakerUser ? activeSpeakerUser.name : null,
+        channelId: event.channelId,
+      })
+    );
 
     if (event.activeSpeaker === this.deviceId) {
       if (!this.micProducer || this.micProducer.closed) {
@@ -146,6 +163,60 @@ export default class WalkieTalkieSession {
     this.detachSocket();
     this.socket = socket;
     this.attachSocket();
+
+    // Listen to Watch messages
+    WatchBridgeService.onMessage(({ path, data }) => {
+      if (path === '/ptt_down') {
+        // Trigger PTT on phone if in a room
+        if (this.initialized && this.socket) {
+          console.log('[watch-bridge] PTT DOWN from watch');
+          this.ensureMicProducer().then((producer) => {
+            if (this.socket && this.roomId && this.channelId && this.deviceId) {
+              this.socket.emit('requestMic', {
+                deviceId: this.deviceId,
+                roomId: this.roomId,
+                channelId: this.channelId,
+              });
+            }
+          });
+        }
+      } else if (path === '/ptt_up') {
+        if (this.initialized && this.socket) {
+          console.log('[watch-bridge] PTT UP from watch');
+          this.socket.emit('releaseMic', {
+            deviceId: this.deviceId,
+            roomId: this.roomId,
+            channelId: this.channelId,
+          });
+          this.releaseMicProducer();
+        }
+      } else if (path === '/watch_connected') {
+        this.syncStateToWatch();
+      }
+    });
+
+    WatchBridgeService.onAudioFrame((base64) => {
+      // If watch mic is active, we'd feed this into a custom stream
+      // This requires an AudioCaptureSource that consumes these frames
+    });
+  }
+
+  private syncStateToWatch() {
+    if (!this.roomId || !this.channelId) return;
+
+    // We need to get the room state from the store or pass it in.
+    // For now, let's use what we have in the session.
+    const state: WatchRoomState = {
+      roomId: this.roomId,
+      channelId: this.channelId,
+      channelName: this.channelId.toUpperCase(), // Placeholder
+      activeSpeakerName: null,
+      isConnected: !!this.socket?.connected,
+      isInRoom: this.initialized,
+      micSource: this.getAudioSourceKind(),
+      isWatchActive: true
+    };
+    WatchBridgeService.updateRoomState(state);
   }
 
   async initialize(options: InitOptions) {
@@ -196,6 +267,7 @@ export default class WalkieTalkieSession {
     console.log('[mediasoup] existing producers synced');
 
     this.initialized = true;
+    this.syncStateToWatch();
   }
 
   async dispose() {

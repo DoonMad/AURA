@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AURA wear</string>
+    <string name="hello_world">Hello, %1$s!</string>
+</resources>

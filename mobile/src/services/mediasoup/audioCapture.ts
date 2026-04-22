@@ -1,6 +1,6 @@
 import { mediaDevices, MediaStream } from 'react-native-webrtc';
 
-export type AudioCaptureSourceKind = 'phone' | 'external';
+export type AudioCaptureSourceKind = 'phone' | 'external' | 'watch';
 
 export type AudioCaptureLease = {
   stream: MediaStream;
