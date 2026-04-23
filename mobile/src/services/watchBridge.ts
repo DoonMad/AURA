@@ -23,6 +23,22 @@ export const WatchBridgeService = {
     WatchBridge.updateRoomState(JSON.stringify(state));
   },
 
+  getWatchStreamId: async (): Promise<string> => {
+    return WatchBridge.getWatchStreamId();
+  },
+
+  initAudioRelay: async (): Promise<boolean> => {
+    return WatchBridge.initAudioRelay();
+  },
+
+  openPhoneApp: async (): Promise<boolean> => {
+    return WatchBridge.openPhoneApp();
+  },
+
+  startWatchApp: () => {
+    WatchBridge.startWatchApp();
+  },
+
   onMessage: (callback: (event: { path: string; data: string }) => void) => {
     return watchEmitter.addListener('onWatchMessage', callback);
   },

@@ -55,3 +55,17 @@ export class ExternalStreamAudioCaptureSource implements AudioCaptureSource {
     };
   }
 }
+
+export class WatchMicAudioCaptureSource implements AudioCaptureSource {
+  kind: AudioCaptureSourceKind = 'watch';
+
+  constructor(private readonly stream: MediaStream) {}
+
+  async acquire(): Promise<AudioCaptureLease> {
+    return {
+      kind: this.kind,
+      stream: this.stream,
+      release: () => undefined,
+    };
+  }
+}

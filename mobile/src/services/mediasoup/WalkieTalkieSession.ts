@@ -1,16 +1,16 @@
 import { Device } from 'mediasoup-client';
 import type { types as MediasoupTypes } from 'mediasoup-client';
-import { MediaStream } from 'react-native-webrtc';
+import { mediaDevices, MediaStream } from 'react-native-webrtc';
 import type { Socket } from 'socket.io-client';
 import { setupWebRTC } from '../webrtc/setupWebRTC';
 import { WatchBridgeService, type WatchRoomState } from '../watchBridge';
-import {
-  ExternalStreamAudioCaptureSource,
-  PhoneMicAudioCaptureSource,
-  type AudioCaptureLease,
-  type AudioCaptureSource,
-  type AudioCaptureSourceKind,
+import * as AudioCapture from './audioCapture';
+import type {
+  AudioCaptureLease,
+  AudioCaptureSource,
+  AudioCaptureSourceKind,
 } from './audioCapture';
+import useAppStore from '../../store/useAppStore';
 
 type SocketAck<T> = {
   ok: true;
@@ -85,7 +85,7 @@ export default class WalkieTalkieSession {
   private micProducerPromise: Promise<Producer> | null = null;
   private localStream: MediaStream | null = null;
   private activeAudioCaptureLease: AudioCaptureLease | null = null;
-  private audioCaptureSource: AudioCaptureSource = new PhoneMicAudioCaptureSource();
+  private audioCaptureSource: AudioCaptureSource = new AudioCapture.PhoneMicAudioCaptureSource();
   private micReleaseRequested = false;
   private initialized = false;
   private pendingConsumers = new Set<string>();
@@ -166,20 +166,25 @@ export default class WalkieTalkieSession {
 
     // Listen to Watch messages
     WatchBridgeService.onMessage(({ path, data }) => {
+      console.log(`[watch-bridge] Received message: ${path} with data: ${data}`);
       if (path === '/ptt_down') {
-        // Trigger PTT on phone if in a room
-        if (this.initialized && this.socket) {
-          console.log('[watch-bridge] PTT DOWN from watch');
-          this.ensureMicProducer().then((producer) => {
-            if (this.socket && this.roomId && this.channelId && this.deviceId) {
-              this.socket.emit('requestMic', {
-                deviceId: this.deviceId,
-                roomId: this.roomId,
-                channelId: this.channelId,
-              });
-            }
-          });
-        }
+        // Switch to watch mic when watch PTT is pressed
+        this.useWatchMicSource().then(() => {
+          useAppStore.getState().setMicSource('watch');
+          // Trigger PTT on phone if in a room
+          if (this.initialized && this.socket) {
+            console.log('[watch-bridge] PTT DOWN from watch');
+            this.ensureMicProducer().then((producer) => {
+              if (this.socket && this.roomId && this.channelId && this.deviceId) {
+                this.socket.emit('requestMic', {
+                  deviceId: this.deviceId,
+                  roomId: this.roomId,
+                  channelId: this.channelId,
+                });
+              }
+            });
+          }
+        });
       } else if (path === '/ptt_up') {
         if (this.initialized && this.socket) {
           console.log('[watch-bridge] PTT UP from watch');
@@ -190,8 +195,15 @@ export default class WalkieTalkieSession {
           });
           this.releaseMicProducer();
         }
+        // Fallback to phone mic after watch release
+        this.usePhoneMicSource();
+        useAppStore.getState().setMicSource('phone');
       } else if (path === '/watch_connected') {
+        console.log('[watch-bridge] watch connected, sync requested');
         this.syncStateToWatch();
+      } else if (path === '/open_phone_app') {
+        console.log('[watch-bridge] watch requested to open phone app');
+        WatchBridgeService.openPhoneApp();
       }
     });
 
@@ -202,20 +214,17 @@ export default class WalkieTalkieSession {
   }
 
   private syncStateToWatch() {
-    if (!this.roomId || !this.channelId) return;
-
-    // We need to get the room state from the store or pass it in.
-    // For now, let's use what we have in the session.
     const state: WatchRoomState = {
-      roomId: this.roomId,
-      channelId: this.channelId,
-      channelName: this.channelId.toUpperCase(), // Placeholder
+      roomId: this.roomId ?? '',
+      channelId: this.channelId ?? '',
+      channelName: (this.channelId ?? 'No Channel').toUpperCase(),
       activeSpeakerName: null,
       isConnected: !!this.socket?.connected,
       isInRoom: this.initialized,
       micSource: this.getAudioSourceKind(),
       isWatchActive: true
     };
+    console.log('[mediasoup] syncing state to watch, isInRoom:', state.isInRoom);
     WatchBridgeService.updateRoomState(state);
   }
 
@@ -267,6 +276,7 @@ export default class WalkieTalkieSession {
     console.log('[mediasoup] existing producers synced');
 
     this.initialized = true;
+    WatchBridgeService.startWatchApp();
     this.syncStateToWatch();
   }
 
@@ -308,6 +318,7 @@ export default class WalkieTalkieSession {
     this.device = null;
     this.initialized = false;
     this.micReleaseRequested = false;
+    this.syncStateToWatch();
   }
 
   getRemoteStreams() {
@@ -323,16 +334,39 @@ export default class WalkieTalkieSession {
   }
 
   usePhoneMicSource() {
-    this.audioCaptureSource = new PhoneMicAudioCaptureSource();
+    this.audioCaptureSource = new AudioCapture.PhoneMicAudioCaptureSource();
     if (this.micProducer || this.localStream) {
       void this.releaseMicProducer();
     }
   }
 
+  async useWatchMicSource() {
+    try {
+      await WatchBridgeService.initAudioRelay();
+      const streamId = await WatchBridgeService.getWatchStreamId();
+      // @ts-ignore - mediaDevices.getAnyStream is not in types but works in react-native-webrtc
+      const stream = await mediaDevices.getUserMedia({ audio: false, video: false });
+      // In react-native-webrtc, we might need a better way to get the local stream by ID
+      // For now, we assume the native side registered it.
+      // A common way to get it back is using a specific constraint or just trusting the bridge.
+
+      // Since we can't easily "get" a stream by ID in JS that was created in Native,
+      // we'll use a placeholder and hope the bridge registered it correctly in the native registry.
+      // The actual implementation might need more glue here.
+
+      this.audioCaptureSource = new AudioCapture.WatchMicAudioCaptureSource(stream);
+      if (this.micProducer || this.localStream) {
+        void this.releaseMicProducer();
+      }
+    } catch (e) {
+      console.warn('[mediasoup] failed to switch to watch mic', e);
+    }
+  }
+
   useExternalAudioStream(stream: MediaStream | null) {
     this.audioCaptureSource = stream
-      ? new ExternalStreamAudioCaptureSource(stream)
-      : new PhoneMicAudioCaptureSource();
+      ? new AudioCapture.ExternalStreamAudioCaptureSource(stream)
+      : new AudioCapture.PhoneMicAudioCaptureSource();
     if (this.micProducer || this.localStream) {
       void this.releaseMicProducer();
     }

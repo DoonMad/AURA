@@ -27,6 +27,8 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
   const deviceId = useAppStore((s) => s.deviceId)
   const notice = useAppStore((s) => s.notice)
   const setNotice = useAppStore((s) => s.setNotice)
+  const micSource = useAppStore((s) => s.micSource)
+  const setMicSource = useAppStore((s) => s.setMicSource)
   const connectionState = useAppStore((s) => s.connectionState)
   const sessionRestorePending = useAppStore((s) => s.sessionRestorePending)
   const setSessionRestorePending = useAppStore((s) => s.setSessionRestorePending)
@@ -500,6 +502,17 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     triggerHaptic('light');
   }
 
+  const toggleMicSource = () => {
+    const nextSource = micSource === 'phone' ? 'watch' : 'phone';
+    setMicSource(nextSource);
+    if (nextSource === 'phone') {
+      mediasoupSession.current?.usePhoneMicSource();
+    } else {
+      mediasoupSession.current?.useWatchMicSource();
+    }
+    triggerHaptic('light');
+  }
+
   const onTalkPressIn = async () => {
     if (!socket || !room || !deviceId || !selectedChannelId) return;
     if (!mediasoupReady) {
@@ -510,6 +523,10 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       console.log('[ptt] pressIn ignored, already in flight');
       return;
     }
+
+    // Ensure phone mic is selected when pressing phone PTT
+    mediasoupSession.current?.usePhoneMicSource();
+    setMicSource('phone');
 
     pttHeldRef.current = true;
     pttInFlightRef.current = true;
@@ -632,6 +649,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
           onLeavePress={onLeavePress}
           volume={volume}
           onVolumeChange={setVolume}
+          micSource={micSource}
         />
       </View>
     </SafeAreaView>

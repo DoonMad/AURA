@@ -52,6 +52,9 @@ interface AppState {
   setSessionRestorePending: (value: boolean) => void;
   pendingDeepLinkRoomId: string | null;
   setPendingDeepLinkRoomId: (roomId: string | null) => void;
+
+  micSource: 'phone' | 'watch';
+  setMicSource: (source: 'phone' | 'watch') => void;
 }
 
 /* ────────────────────────────────────────────
@@ -69,6 +72,8 @@ const useAppStore = create<AppState>((set) => ({
   connectionState: 'disconnected',
   sessionRestorePending: false,
   pendingDeepLinkRoomId: null,
+
+  micSource: 'phone',
 
   // ── Actions ──
   setIdentity: (deviceId, displayName) =>
@@ -107,6 +112,9 @@ const useAppStore = create<AppState>((set) => ({
 
   setPendingDeepLinkRoomId: (pendingDeepLinkRoomId) =>
     set({ pendingDeepLinkRoomId }),
+
+  setMicSource: (micSource) =>
+    set({ micSource }),
 }));
 
 /* ────────────────────────────────────────────
