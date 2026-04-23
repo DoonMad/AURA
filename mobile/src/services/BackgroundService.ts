@@ -1,7 +1,7 @@
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { Platform } from 'react-native';
 
-const CHANNEL_ID = 'aura-background';
+const CHANNEL_ID = 'aura-background-v2';
 let channelReady = false;
 
 async function ensureChannel() {
@@ -11,7 +11,7 @@ async function ensureChannel() {
     await notifee.createChannel({
       id: CHANNEL_ID,
       name: 'AURA Service',
-      importance: AndroidImportance.HIGH,
+      importance: AndroidImportance.LOW,
       description: 'Maintains live connection to AURA frequency',
       vibration: false,
     });
@@ -51,6 +51,7 @@ async function displayServiceNotification(
     android: {
       channelId: CHANNEL_ID,
       asForegroundService: true,
+      onlyAlertOnce: true,
       color: '#22C55E',
       colorized: true,
       ongoing: true,
