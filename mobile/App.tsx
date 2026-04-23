@@ -7,7 +7,7 @@ import EntryScreen from './src/screens/EntryScreen';
 import RoomScreen from './src/screens/RoomScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import MembersScreen from './src/screens/MembersScreen';
-import MicTesterScreen from './src/screens/MicTesterScreen';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import type { RootStackParamList } from './src/types/navigation';
@@ -203,10 +203,7 @@ export default function App() {
             name="Members"
             component={MembersScreen}
           />
-          <Stack.Screen
-            name="MicTester"
-            component={MicTesterScreen}
-          />
+
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

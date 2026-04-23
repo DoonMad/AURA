@@ -231,14 +231,6 @@ const EntryScreen: React.FC<EntryScreenProps> = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Hardware Debug Button */}
-          <View className="mt-12 w-full max-w-sm mx-auto">
-            <PrimaryButton
-              title="Mic Tester"
-              onPress={() => navigation.navigate('MicTester')}
-              variant="outline"
-            />
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
