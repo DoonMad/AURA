@@ -117,7 +117,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-aura-active opacity-0 group-hover:opacity-5 blur-3xl transition-opacity duration-700 rounded-full"></div>
             <div className="relative w-[320px] h-[640px] bg-[#050505] border border-[#222] rounded-[48px] overflow-hidden shadow-2xl transition-transform duration-700 group-hover:-translate-y-2">
               <Image 
-                src="/aura-mobile.png" 
+                src="/aura-mobile.jpg" 
                 alt="AURA Mobile Interface" 
                 fill
                 className="object-cover"
