@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.wear.compose.material3.*
@@ -235,16 +234,5 @@ fun MainRoomUI(state: RoomState, isPressed: Boolean, viewModel: WatchViewModel) 
                 )
             }
         }
-
-        // Bottom Source
-        Text(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp),
-            text = "${state.micSource.uppercase()} MIC",
-            style = MaterialTheme.typography.labelSmall,
-            color = AuraTertiaryText,
-            fontSize = 8.sp
-        )
     }
 }

@@ -78,3 +78,5 @@ yarn-error.log
 temp/
 CONTEXT.md
 .env
+test/
+*.apk

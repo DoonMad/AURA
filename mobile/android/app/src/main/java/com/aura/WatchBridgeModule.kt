@@ -21,6 +21,18 @@ class WatchBridgeModule(reactContext: ReactApplicationContext) :
         Wearable.getMessageClient(reactContext).addListener(this)
         Wearable.getDataClient(reactContext).addListener(this)
         
+        // Clear old state on app startup to prevent "stuck" watch rooms
+        scope.launch {
+            try {
+                Wearable.getDataClient(reactContext).deleteDataItems(
+                    android.net.Uri.parse("wear://*/room_state")
+                )
+                Log.d("WatchBridge", "Cleared stale room state on startup")
+            } catch (e: Exception) {
+                Log.e("WatchBridge", "Failed to clear stale state", e)
+            }
+        }
+        
         // Log watch capability for debugging
         scope.launch {
             try {
@@ -117,22 +129,19 @@ class WatchBridgeModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun updateRoomState(stateJson: String) {
-        Log.d("WatchBridge", "updateRoomState called with: $stateJson")
+        Log.d("WatchBridge", "updateRoomState: $stateJson")
         scope.launch {
             try {
                 // Ensure nodes are fresh
                 val nodes = Tasks.await(Wearable.getNodeClient(reactApplicationContext).connectedNodes)
-                Log.d("WatchBridge", "Connected nodes for state update: ${nodes.size}")
                 
                 for (node in nodes) {
                     // Send state via message as a fast fallback to DataClient
-                    // We REMOVED /start_wear_app from here to prevent constant restarts
                     Wearable.getMessageClient(reactApplicationContext).sendMessage(
                         node.id,
                         "/room_state_sync",
                         stateJson.toByteArray()
                     )
-                    Log.d("WatchBridge", "Sent /room_state_sync message to node ${node.id}")
                 }
 
                 val request = PutDataMapRequest.create("/room_state").apply {
@@ -140,8 +149,7 @@ class WatchBridgeModule(reactContext: ReactApplicationContext) :
                     dataMap.putLong("timestamp", System.currentTimeMillis())
                 }.asPutDataRequest().setUrgent()
                 
-                val result = Tasks.await(Wearable.getDataClient(reactApplicationContext).putDataItem(request))
-                Log.d("WatchBridge", "PutDataMapRequest success: ${result.uri}")
+                Tasks.await(Wearable.getDataClient(reactApplicationContext).putDataItem(request))
             } catch (e: Exception) {
                 Log.e("WatchBridge", "Failed to update room state", e)
             }
@@ -177,6 +185,31 @@ class WatchBridgeModule(reactContext: ReactApplicationContext) :
             }
         } catch (e: Exception) {
             promise.reject("ERR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun clearRoomState() {
+        Log.d("WatchBridge", "clearRoomState requested")
+        scope.launch {
+            try {
+                // Inform watch immediately via message
+                val nodes = Tasks.await(Wearable.getNodeClient(reactApplicationContext).connectedNodes)
+                for (node in nodes) {
+                    Wearable.getMessageClient(reactApplicationContext).sendMessage(
+                        node.id,
+                        "/room_state_sync",
+                        "{\"isInRoom\":false}".toByteArray()
+                    )
+                }
+
+                // Clear persistent data
+                Wearable.getDataClient(reactApplicationContext).deleteDataItems(
+                    android.net.Uri.parse("wear://*/room_state")
+                )
+            } catch (e: Exception) {
+                Log.e("WatchBridge", "Failed to clear room state", e)
+            }
         }
     }
 

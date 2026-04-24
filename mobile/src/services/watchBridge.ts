@@ -23,6 +23,10 @@ export const WatchBridgeService = {
     WatchBridge.updateRoomState(JSON.stringify(state));
   },
 
+  clearRoomState: () => {
+    WatchBridge.clearRoomState();
+  },
+
   getWatchStreamId: async (): Promise<string> => {
     return WatchBridge.getWatchStreamId();
   },

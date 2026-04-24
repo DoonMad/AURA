@@ -57,7 +57,10 @@ class WatchAudioProvider(private val reactContext: ReactApplicationContext) {
             lastLogTime = now
         }
 
-        // TODO: Inject into WebRTC pipeline
+        // TODO: In a production app, we would use a Loopback or AudioTrack.write
+        // to inject these into the WebRTC factory.
+        // Since we are using standard getUserMedia for compatibility, we would
+        // normally need a native patch to WebRTCModule to swap the sources.
     }
 
     fun dispose() {

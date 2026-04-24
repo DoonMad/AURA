@@ -456,9 +456,14 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
     return () => {
       mediasoupSession.current?.dispose();
       mediasoupSession.current = null;
-      if (Platform.OS === 'android' && backgroundServiceActiveRef.current) {
-        void BackgroundService.stopService();
-        backgroundServiceActiveRef.current = false;
+      if (Platform.OS === 'android') {
+        import('../services/watchBridge').then(({ WatchBridgeService }) => {
+          WatchBridgeService.clearRoomState();
+        });
+        if (backgroundServiceActiveRef.current) {
+          void BackgroundService.stopService();
+          backgroundServiceActiveRef.current = false;
+        }
       }
     };
   }, []);
@@ -524,7 +529,7 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
       return;
     }
 
-    // Ensure phone mic is selected when pressing phone PTT
+    // AUTO-SWITCH: Ensure phone mic is selected when pressing phone PTT
     mediasoupSession.current?.usePhoneMicSource();
     setMicSource('phone');
 
@@ -649,7 +654,6 @@ const RoomScreen: React.FC<RoomScreenProps> = ({ navigation }) => {
           onLeavePress={onLeavePress}
           volume={volume}
           onVolumeChange={setVolume}
-          micSource={micSource}
         />
       </View>
     </SafeAreaView>

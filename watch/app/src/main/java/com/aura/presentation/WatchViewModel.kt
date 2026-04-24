@@ -2,16 +2,23 @@ package com.aura.presentation
 
 import android.Manifest
 import android.app.Application
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.wear.remote.interactions.RemoteActivityHelper
@@ -22,7 +29,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import java.util.concurrent.Executors
-import androidx.core.net.toUri
 
 data class RoomState(
     val roomId: String = "",
@@ -32,7 +38,7 @@ data class RoomState(
     val isConnected: Boolean = false,
     val isInRoom: Boolean = false,
     val micSource: String = "phone", // "phone" or "watch"
-    val isWatchActive: Boolean = false
+    val isWatchActive: Boolean = false,
 )
 
 class WatchViewModel(application: Application) : AndroidViewModel(application), 
@@ -48,6 +54,9 @@ class WatchViewModel(application: Application) : AndroidViewModel(application),
     private val messageClient = Wearable.getMessageClient(application)
     private val nodeClient = Wearable.getNodeClient(application)
     private val remoteActivityHelper = RemoteActivityHelper(application, Executors.newSingleThreadExecutor())
+    private val vibrator = application.getSystemService(Vibrator::class.java)
+
+    private var cachedPhoneNodes: List<Node> = emptyList()
 
     private val sampleRate = 16000
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
@@ -65,6 +74,8 @@ class WatchViewModel(application: Application) : AndroidViewModel(application),
                 // Log all nodes for debugging
                 val allNodes = nodeClient.connectedNodes.await()
                 Log.d("WatchViewModel", "Total connected nodes: ${allNodes.size}")
+                cachedPhoneNodes = allNodes
+                
                 allNodes.forEach { node ->
                     Log.d("WatchViewModel", "Node: ${node.displayName}, ID: ${node.id}, isNearby: ${node.isNearby}")
                 }
@@ -81,13 +92,31 @@ class WatchViewModel(application: Application) : AndroidViewModel(application),
                 updateConnectionStatus(capabilityInfo.nodes.isNotEmpty())
 
                 // Then listen for changes
-                capabilityClient.addListener({
-                    Log.d("WatchViewModel", "Capability changed. Nodes: ${it.nodes.size}")
-                    updateConnectionStatus(it.nodes.isNotEmpty())
-                }, "aura_phone_app")
+                capabilityClient.addListener(
+                    {
+                        Log.d("WatchViewModel", "Capability changed. Nodes: ${it.nodes.size}")
+                        cachedPhoneNodes = it.nodes.toList()
+                        updateConnectionStatus(it.nodes.isNotEmpty())
+                    },
+                    "aura_phone_app",
+                )
             } catch (e: Exception) {
                 Log.e("WatchViewModel", "Failed to setup capability listener", e)
             }
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.VIBRATE)
+    private fun triggerHaptic(effectId: Int) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(effectId))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(50)
+            }
+        } catch (e: Exception) {
+            // Ignore if effect not supported
         }
     }
 
@@ -201,26 +230,32 @@ class WatchViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    @RequiresPermission(Manifest.permission.VIBRATE)
     fun onPttDown() {
         if (isPttPressed) return
         isPttPressed = true
         Log.d("WatchViewModel", "PTT Down")
+        triggerHaptic(VibrationEffect.EFFECT_CLICK)
         sendMessage("/ptt_down", "")
-        if (roomState.micSource == "watch") {
-            startAudioStreaming()
-        }
+        // Always start streaming from watch when PTT is pressed on watch.
+        // The phone will automatically switch to this source.
+        startAudioStreaming()
     }
 
+    @RequiresPermission(Manifest.permission.VIBRATE)
     fun onPttUp() {
         if (!isPttPressed) return
         isPttPressed = false
         Log.d("WatchViewModel", "PTT Up")
+        triggerHaptic(VibrationEffect.EFFECT_TICK)
         sendMessage("/ptt_up", "")
         stopAudioStreaming()
     }
 
+    @RequiresPermission(Manifest.permission.VIBRATE)
     fun openPhoneApp() {
         Log.d("WatchViewModel", "Requesting to open phone app via RemoteActivityHelper and MessageClient")
+        triggerHaptic(VibrationEffect.EFFECT_HEAVY_CLICK)
         
         viewModelScope.launch {
             try {
@@ -228,8 +263,8 @@ class WatchViewModel(application: Application) : AndroidViewModel(application),
                 nodes.forEach { node ->
                     // 1. Try modern RemoteActivityHelper
                     try {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
-                            .addCategory(android.content.Intent.CATEGORY_BROWSABLE)
+                        val intent = Intent(Intent.ACTION_VIEW)
+                            .addCategory(Intent.CATEGORY_BROWSABLE)
                             .setData("aura://join".toUri()) // Using the scheme from manifest
                         
                         // remoteActivityHelper.startRemoteActivity(intent, node.id).await()
@@ -291,7 +326,8 @@ class WatchViewModel(application: Application) : AndroidViewModel(application),
                 try {
                     audioRecord.stop()
                     audioRecord.release()
-                } catch (e: Exception) {}
+                } catch (_: Exception) {
+                }
             }
         }
     }
@@ -303,29 +339,29 @@ class WatchViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private fun sendMessage(path: String, message: String) {
-        viewModelScope.launch {
-            try {
-                val nodes = nodeClient.connectedNodes.await()
-                Log.d("WatchViewModel", "Sending message $path to ${nodes.size} nodes")
-                nodes.forEach { node ->
-                    messageClient.sendMessage(node.id, path, message.toByteArray()).await()
-                }
-            } catch (e: Exception) {
-                Log.e("WatchViewModel", "Failed to send message: $path", e)
+        // Optimize: Use cached nodes if available to avoid await() latency
+        val nodes = cachedPhoneNodes.ifEmpty { 
+            // Fallback: only if cache is empty, launch a discovery task
+            viewModelScope.launch {
+                try {
+                    cachedPhoneNodes = nodeClient.connectedNodes.await()
+                } catch (e: Exception) {}
             }
+            return 
+        }
+
+        Log.d("WatchViewModel", "Sending message $path to ${nodes.size} nodes (cached)")
+        for (node in nodes) {
+            messageClient.sendMessage(node.id, path, message.toByteArray())
         }
     }
 
     private fun sendMessage(path: String, data: ByteArray) {
-        viewModelScope.launch {
-            try {
-                val nodes = nodeClient.connectedNodes.await()
-                nodes.forEach { node ->
-                    messageClient.sendMessage(node.id, path, data).await()
-                }
-            } catch (e: Exception) {
-                Log.e("WatchViewModel", "Failed to send data: $path", e)
-            }
+        val nodes = cachedPhoneNodes
+        if (nodes.isEmpty()) return
+        
+        for (node in nodes) {
+            messageClient.sendMessage(node.id, path, data)
         }
     }
 

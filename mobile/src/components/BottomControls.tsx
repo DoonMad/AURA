@@ -3,14 +3,13 @@ import { View, Text, TouchableOpacity } from 'react-native'
 import type { BottomControlsProps } from '../types'
 import Icon from 'react-native-vector-icons/Feather'
 
-const BottomControls: React.FC<Omit<BottomControlsProps, 'onSharePress'> & { micSource?: string }> = ({
+const BottomControls: React.FC<Omit<BottomControlsProps, 'onSharePress'>> = ({
   memberChannelCount,
   totalMemberCount,
   onMembersPress,
   onLeavePress,
   volume,
   onVolumeChange,
-  micSource,
 }) => {
   return (
     <View className="absolute bottom-10 w-full flex-row justify-between px-8 items-end z-10 pointer-events-box-none">
@@ -27,18 +26,6 @@ const BottomControls: React.FC<Omit<BottomControlsProps, 'onSharePress'> & { mic
           {memberChannelCount}/{totalMemberCount}
         </Text>
       </View>
-
-      {/* Center: Mic Source Status */}
-      {/* <View className="items-center pointer-events-auto mb-[-8px]">
-        <View
-          className="px-4 h-10 bg-surface rounded-full items-center justify-center border border-aura-border shadow-lg flex-row"
-        >
-          <Icon name={micSource === 'watch' ? 'watch' : 'smartphone'} size={14} color={micSource === 'watch' ? '#22C55E' : '#FAFAFA'} />
-          <Text className={`text-[10px] font-black ml-2 uppercase tracking-[1px] ${micSource === 'watch' ? 'text-aura-accent' : 'text-aura-primary'}`}>
-            {micSource === 'watch' ? 'WATCH MIC' : 'PHONE MIC'}
-          </Text>
-        </View>
-      </View> */}
 
       {/* Right Dock: Leave */}
       <View className="items-center pointer-events-auto">

@@ -59,13 +59,24 @@ export class ExternalStreamAudioCaptureSource implements AudioCaptureSource {
 export class WatchMicAudioCaptureSource implements AudioCaptureSource {
   kind: AudioCaptureSourceKind = 'watch';
 
-  constructor(private readonly stream: MediaStream) {}
-
   async acquire(): Promise<AudioCaptureLease> {
+    const stream = await mediaDevices.getUserMedia({
+      audio: true,
+      video: false,
+    });
+
     return {
       kind: this.kind,
-      stream: this.stream,
-      release: () => undefined,
+      stream,
+      release: () => {
+        stream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (error) {
+            console.warn('[mediasoup] failed to stop watch capture track', error);
+          }
+        });
+      },
     };
   }
 }

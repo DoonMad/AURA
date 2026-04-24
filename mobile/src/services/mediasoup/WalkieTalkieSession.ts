@@ -187,13 +187,14 @@ export default class WalkieTalkieSession {
         });
       } else if (path === '/ptt_up') {
         if (this.initialized && this.socket) {
-          console.log('[watch-bridge] PTT UP from watch');
+          console.log('[watch-bridge] PTT UP from watch - releasing immediately');
+          // Prioritize socket emission over local cleanup
           this.socket.emit('releaseMic', {
             deviceId: this.deviceId,
             roomId: this.roomId,
             channelId: this.channelId,
           });
-          this.releaseMicProducer();
+          void this.releaseMicProducer();
         }
         // Fallback to phone mic after watch release
         this.usePhoneMicSource();
@@ -204,6 +205,16 @@ export default class WalkieTalkieSession {
       } else if (path === '/open_phone_app') {
         console.log('[watch-bridge] watch requested to open phone app');
         WatchBridgeService.openPhoneApp();
+      } else if (path === '/toggle_mic') {
+        console.log('[watch-bridge] watch requested mic toggle to:', data);
+        if (data === 'watch') {
+          this.useWatchMicSource().then(() => {
+            useAppStore.getState().setMicSource('watch');
+            this.syncStateToWatch();
+          });
+        } else {
+          this.usePhoneMicSource();
+        }
       }
     });
 
@@ -224,7 +235,7 @@ export default class WalkieTalkieSession {
       micSource: this.getAudioSourceKind(),
       isWatchActive: true
     };
-    console.log('[mediasoup] syncing state to watch, isInRoom:', state.isInRoom);
+    console.log('[mediasoup] syncing state to watch, isInRoom:', state.isInRoom, 'source:', state.micSource);
     WatchBridgeService.updateRoomState(state);
   }
 
@@ -338,28 +349,38 @@ export default class WalkieTalkieSession {
     if (this.micProducer || this.localStream) {
       void this.releaseMicProducer();
     }
+    this.syncStateToWatch();
   }
 
   async useWatchMicSource() {
+    console.log('[mediasoup] switching to watch mic source');
+    // Set immediate UI state
+    useAppStore.getState().setMicSource('watch');
+
     try {
       await WatchBridgeService.initAudioRelay();
-      const streamId = await WatchBridgeService.getWatchStreamId();
-      // @ts-ignore - mediaDevices.getAnyStream is not in types but works in react-native-webrtc
-      const stream = await mediaDevices.getUserMedia({ audio: false, video: false });
-      // In react-native-webrtc, we might need a better way to get the local stream by ID
-      // For now, we assume the native side registered it.
-      // A common way to get it back is using a specific constraint or just trusting the bridge.
 
-      // Since we can't easily "get" a stream by ID in JS that was created in Native,
-      // we'll use a placeholder and hope the bridge registered it correctly in the native registry.
-      // The actual implementation might need more glue here.
+      // We MUST use a real MediaStreamTrack from getUserMedia, otherwise Mediasoup
+      // cannot add it to a transceiver. We'll mark it as 'watch' so the native
+      // layer knows to ignore the hardware mic data and use the relay instead.
+      const stream = await mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+        video: false
+      });
 
       this.audioCaptureSource = new AudioCapture.WatchMicAudioCaptureSource(stream);
       if (this.micProducer || this.localStream) {
         void this.releaseMicProducer();
       }
+      this.syncStateToWatch();
     } catch (e) {
       console.warn('[mediasoup] failed to switch to watch mic', e);
+      // Fallback to phone mic if relay fails
+      this.usePhoneMicSource();
     }
   }
 
@@ -424,13 +445,7 @@ export default class WalkieTalkieSession {
   async releaseMicProducer() {
     this.micReleaseRequested = true;
 
-    if (this.micProducerPromise) {
-      console.log('[mediasoup] mic release requested while producer creation is in flight');
-      return;
-    }
-
     const producer = this.micProducer;
-
     if (producer && !producer.closed) {
       console.log('[mediasoup] closing mic producer for release', producer.id);
       try {
@@ -445,8 +460,9 @@ export default class WalkieTalkieSession {
       this.onTracksUpdated?.();
     }
 
+    // Optimization: Release lease in background, don't await it
     if (this.activeAudioCaptureLease) {
-      await this.releaseCaptureLease('[mediasoup] failed to release audio capture lease');
+      void this.releaseCaptureLease('[mediasoup] failed to release audio capture lease');
     }
 
     this.micProducer = null;
