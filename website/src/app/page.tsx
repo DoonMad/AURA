@@ -32,11 +32,11 @@ export default function Home() {
             High-fidelity, real-time voice communication platform. Engineered for instant push-to-talk over persistent channels.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <a href="https://github.com/DoonMad/AURA/releases/latest" className="group px-8 py-4 bg-aura-active text-black font-bold rounded hover:bg-[#00e65c] transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(0,255,102,0.15)] hover:shadow-[0_0_30px_rgba(0,255,102,0.3)]">
+            <a href="https://github.com/DoonMad/AURA/releases/download/v1.0.0/aura.apk" className="group px-8 py-4 bg-aura-active text-black font-bold rounded hover:bg-[#00e65c] transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(0,255,102,0.15)] hover:shadow-[0_0_30px_rgba(0,255,102,0.3)]">
               <svg className="transition-transform group-hover:-translate-y-0.5" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Get Mobile App
             </a>
-            <a href="https://github.com/DoonMad/AURA/releases/latest" className="group px-8 py-4 bg-transparent border border-aura-border text-aura-text font-bold rounded hover:bg-aura-surface hover:border-aura-muted transition-all duration-300 flex items-center justify-center gap-3">
+            <a href="https://github.com/DoonMad/AURA/releases/download/v1.0.0/aura-watch.apk" className="group px-8 py-4 bg-transparent border border-aura-border text-aura-text font-bold rounded hover:bg-aura-surface hover:border-aura-muted transition-all duration-300 flex items-center justify-center gap-3">
               <svg className="text-aura-muted group-hover:text-aura-text transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
               Get Watch App
             </a>
