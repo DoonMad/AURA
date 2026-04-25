@@ -10,12 +10,21 @@ Traditional voice chat applications are bloated, computationally heavy, and rely
 AURA is purpose-built for the critical moment. By leveraging a centralized Selective Forwarding Unit (SFU) architecture using **mediasoup** and raw WebRTC, AURA processes and routes all audio streams through an intelligent backend server. This ensures that clients only need to send one stream up and receive one optimized stream down, allowing the system to scale flawlessly even in low-bandwidth environments.
 
 ## Key Features
-- **Instant Push-To-Talk:** Sub-second latency PTT utilizing the Opus codec over raw UDP transports.
-- **Multi-Channel Routing:** Seamlessly switch between isolated communication frequencies (channels) within a unified room context.
-- **Background Persistence:** A native Android foreground service ensures the socket signaling and WebRTC transport stay alive, even when the device is locked or the app is minimized.
-- **Wear OS Companion:** A synchronized smartwatch application that mirrors the room state and allows operators to trigger transmissions directly from their wrist using the Wearable Data Layer API.
-- **Live Roster & Telemetry:** Real-time visibility into active members, online statuses, and live speaker indications.
-- **Authoritative State Sync:** The React Native Zustand store is perfectly synchronized with the Node.js backend via authoritative Socket.io broadcasts.
+
+### Core Communication
+- **Instant Push-To-Talk (PTT):** Sub-second latency voice transmission utilizing the high-fidelity Opus codec over raw UDP transports.
+- **Intelligent Audio Routing:** Advanced hardware integration using `InCallManager` dynamically routes audio between the loud speakerphone, Bluetooth headsets, and wired peripherals seamlessly without dropping the WebRTC connection.
+- **Multi-Channel Multiplexing:** Instantly switch between isolated communication frequencies (channels) within a unified room context, managed securely by the SFU without tearing down the connection.
+
+### Platform Integration
+- **Background Persistence Engine:** A resilient, native Android Foreground Service ensures socket signaling and WebRTC transports remain completely active, even when the device is locked, asleep, or the app is swiped away.
+- **Cross-Device Wear OS Bridge:** A fully synchronized smartwatch application built with Jetpack Compose. It leverages the Wearable Data Layer API to remotely trigger transmissions, toggle the active microphone source, and mirror the room state on your wrist.
+- **Deep Link Provisioning:** Instant, frictionless room access. Clicking an `aura://join/` link automatically launches the app, authenticates the operative, and bypasses the entry screens to immediately tune into the target frequency.
+
+### Architecture & Reliability
+- **Authoritative State Sync:** The React Native `Zustand` global store is kept in perfect harmony with the Node.js backend via authoritative `Socket.io` event broadcasts, ensuring UI consistency across all connected clients.
+- **In-Flight Flood Protection:** Robust debouncing and concurrency guards prevent backend flooding, race conditions, and duplicate WebRTC producer instances during rapid hardware interactions.
+- **Live Telemetry & Roster:** Real-time observability into active room members, online connectivity statuses, channel population, and instantaneous active-speaker indications.
 
 ## System Architecture
 
@@ -77,5 +86,6 @@ npm run android
 - **Advanced Codecs:** Support for variable bitrate encoding depending on network conditions.
 
 ## Links
-- **Download Mobile APK:** [GitHub Releases](https://github.com/DoonMad/AURA/releases)
-- **Download Watch APK:** [GitHub Releases](https://github.com/DoonMad/AURA/releases)
+- **Landing Page:** [AURA](https://aura-walkie-talkie.vercel.app/)
+- **Download Mobile APK:** [GitHub Releases](https://github.com/DoonMad/AURA/releases/download/v1.0.0/aura.apk)
+- **Download Watch APK:** [GitHub Releases](https://github.com/DoonMad/AURA/releases/download/v1.0.0/aura-watch.apk)
